@@ -1,0 +1,24 @@
+---
+# ------------------------------------------------------------------------------
+# Global variables
+# ------------------------------------------------------------------------------
+
+oracle_user_home:       "/home/oracle"
+nfs_loc:                "/opt/share/Software"
+
+# ------------------------------------------------------------------------------
+# Oracle Software Installation Options
+# ------------------------------------------------------------------------------
+
+install_group:          "oinstall"
+inventory_location:     "/opt/app/oraInventory"
+oracle_base:            "/opt/app/oracle"
+osdba_group:            "dba"
+
+# ------------------------------------------------------------------------------
+# Database file layout
+# ------------------------------------------------------------------------------
+
+dataLocation:           "{{ oracle_base }}/oradata"
+recoveryLocation:       "{{ oracle_base }}/recoveryarea"
+...

@@ -1,0 +1,7 @@
+---
+# ------------------------------------------------------------------------------
+# Configuration options for 12C R1 database installations
+# ------------------------------------------------------------------------------
+
+pre_install_rpm:        "oracle-rdbms-server-12cR1-preinstall"
+...
