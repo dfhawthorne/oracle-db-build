@@ -1,0 +1,15 @@
+#!/bin/env bash
+# ------------------------------------------------------------------------------
+# 8.1 Making Oracle Database EM Express Available to Remote Clients 
+# Ref: https://docs.oracle.com/en/database/oracle/oracle-database/18/xeinl/making-oracle-database-em-express-available-remote-clients.html
+# ------------------------------------------------------------------------------
+
+export ORACLE_SID=XE 
+export ORACLE_HOME=/opt/oracle/product/18c/dbhomeXE
+export PATH=${ORACLE_HOME}/bin:${PATH}
+
+sqlplus -L system/{{ pw_all }} <<DONE
+EXEC DBMS_XDB.SETLISTENERLOCALACCESS(FALSE);
+EXIT
+DONE
+

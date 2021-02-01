@@ -1,13 +1,8 @@
 ---
 # ------------------------------------------------------------------------------
-# Oracle database hosts
+# Host specific variables for XE
 # ------------------------------------------------------------------------------
 
-V19C:
-  hosts:
-    dural.yaocm.id.au
-
-XE:
-  hosts:
-    xe.yaocm.id.au
+ansible_interpreter_python:
+                        "/usr/bin/python"
 ...

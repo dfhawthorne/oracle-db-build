@@ -4,7 +4,9 @@
 # ------------------------------------------------------------------------------
 
 oracle_user_home:       "/home/oracle"
-nfs_loc:                "/opt/share/Software"
+nfs_software_dir:       "/opt/share/Software"
+nfs_software_loc:       "192.168.1.253:/data/Software"
+auto_direct:            "/etc/auto.direct"
 
 # ------------------------------------------------------------------------------
 # Oracle Software Installation Options
