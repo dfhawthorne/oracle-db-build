@@ -11,15 +11,13 @@
 # Only support Ansible 2.10+ and Oracle Linux 8+
 # ------------------------------------------------------------------------------
 
-  - name:               "Only support Ansible 2.10+"
-    ansible.builtin.assert:
-      msg:              "Only support Ansible 2.10+"
-      that:             ansible_version.full is version('2.10.0', '>=')
-
-  - name:               "Only support Oracle Linux 8+"
-    ansible.builtin.assert:
-      msg:              "Only support Oracle Linux 8+"
-      that:             ansible_distribution == "OracleLinux" and ansible_distribution_major_version >= '8'
+  - name:               "Only support Ansible 2.10+ if running on OL 8+"
+    assert:
+      msg:              "Only support Ansible 2.10+ if running on OL 8+"
+      that: >
+                        ansible_version.full is version('2.10.0', '<') or 
+                        (ansible_distribution == "OracleLinux" and
+                        ansible_distribution_major_version >= '8')
 
 # ----------------------------------------------------------------------------
 # Load passwords from passwords/oracle.yml which has the following variables:
@@ -32,7 +30,7 @@
 # ----------------------------------------------------------------------------
 
   - name:               "Load passwords"
-    ansible.builtin.include_vars:
+    include_vars:
       file:             "passwords/oracle.yml"
     no_log:             true
 
@@ -41,15 +39,17 @@
 # ------------------------------------------------------------------------------
 
   - name:               "Install minimal packages"
-    ansible.builtin.yum:
+    yum:
       name:
         -               nscd
         -               autofs
+        -               nfs-utils
+      state:            present
     become:             yes
     become_user:        root
 
   - name:               "Create mount point"
-    ansible.builtin.file:
+    file:
       path:             "{{ nfs_software_dir }}"
       state:            directory
       mode:             0775
@@ -57,19 +57,19 @@
     become_user:        root
 
   - name:               "Remove NFS mount point"
-    ansible.posix.mount:
+    mount:
       path:             "{{ nfs_software_dir }}"
       state:            absent
     become:             yes
     become_user:        root
 
   - name:               "Check for existence of AutoFS master file"
-    ansible.builtin.stat:
+    stat:
       path:             /etc/auto.master
     register:           autofs_master
 
   - name:               "Point to {{ auto_direct }}"
-    ansible.builtin.lineinfile:
+    lineinfile:
       path:             /etc/auto.master
       regexp:           '^/-'
       insertafter:      EOF
@@ -83,7 +83,7 @@
       -                 autofs_master.stat.exists
 
   - name:               "AutoFS mount points"
-    ansible.builtin.lineinfile:
+    lineinfile:
       path:             "{{ auto_direct }}"
       regexp:           "^{{ nfs_software_dir }}"
       insertafter:      EOF
@@ -102,7 +102,7 @@
     meta:               flush_handlers
 
   - name:               "Enable AUTOFS service"
-    ansible.builtin.service:
+    service:
       name:             autofs
       enabled:          yes
       state:            started
@@ -111,6 +111,17 @@
     when:
       -                 autofs_master.stat is defined
       -                 autofs_master.stat.exists
+
+# ------------------------------------------------------------------------------
+# Include any OS specific tasks
+# ------------------------------------------------------------------------------
+
+  - name:               "Run Oracle Linux 7 specific tasks"
+    include_tasks:
+      file:             ol7_tasks.yml
+    when:
+      -                 ansible_distribution == "OracleLinux"
+      -                 ansible_distribution_major_version == '7'
 
 # ------------------------------------------------------------------------------
 # Use the Ansible group name to determine what script to follow.
@@ -132,7 +143,7 @@
   handlers:
 
   - name:               "Restart AutoFS service"
-    ansible.builtin.service:
+    service:
       name:             autofs
       state:            restarted
     become:             yes

@@ -5,66 +5,45 @@
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
+# Can only install XE on Oracle Linux 7
+# ------------------------------------------------------------------------------
+
+- name:                 "Can only install XE on Oracle Linux 7"
+  assert:
+    msg:                "Can only install XE on Oracle Linux 7"
+    that: 
+      -                 ansible_distribution == "OracleLinux" 
+      -                 ansible_distribution_major_version == '7'
+
+# ------------------------------------------------------------------------------
 # Global variables
 # ------------------------------------------------------------------------------
 
 - name:                 "Set Global Variables"
-  ansible.builtin.set_fact:
+  set_fact:
     configure_script:   "/etc/init.d/oracle-xe-18c"
     enable_em_script:   "{{ oracle_user_home }}/enable_em_to_ext_clients.sh"
-
-# ------------------------------------------------------------------------------
-# Install Python PEXPECT modules
-# ------------------------------------------------------------------------------
-
-- name:            "Ensure old version of PEXPECT is not installed on OEL 7+ systems"
-  ansible.builtin.yum:
-    name:          pexpect
-    state:         absent
-  become:          yes
-  become_user:     root
-
-#- name:            "Install SETUP_TOOLS for EASY_INSTALL on OEL 7+ systems"
-#  ansible.builtin.yum:
-#    name:          python-setuptools
-#    state:         latest
-#  become:          yes
-#  become_user:     root
-
-#- name:            "Install PIP on OEL 7+ systems"
-#  community.general.easy_install:
-#    name:          pip
-#    state:         latest
-#  become:          yes
-#  become_user:     root
-
-- name:            "Use PIP to install PEXPECT on OEL 7+ systems"
-  ansible.builtin.pip:
-    name:          pexpect
-    state:         latest
-  become:          yes
-  become_user:     root
 
 # ------------------------------------------------------------------------------
 # 5.1 Installing Oracle Database XE Using RPM Packages
 # Ref: https://docs.oracle.com/en/database/oracle/oracle-database/18/xeinl/procedure-installing-oracle-database-xe.html
 # ------------------------------------------------------------------------------
 
-- name:                 "Install 19C pre-installation RPM"
-  ansible.builtin.yum:
-    name:               oracle-database-preinstall-19c
+- name:                 "Install 18C pre-installation RPM"
+  yum:
+    name:               oracle-database-preinstall-18c
     state:              present
   become:               yes
   become_user:          root
   register:             pre_install_rpm
   
 - name:                 "Display output from Pre-installation RPM"
-  ansible.builtin.debug:
+  debug:
     var:                pre_install_rpm.stdout_lines
   when:                 pre_install_rpm.stdout_lines is defined
 
 - name:                 "Install 18C XE RPM"
-  ansible.builtin.yum:
+  yum:
     name:               "{{ nfs_software_dir }}/database/oracle-database-xe-18c-1.0-1.x86_64.rpm"
     state:              present
   become:               yes
@@ -72,7 +51,7 @@
   register:             install_xe
   
 - name:                 "Display output from XE Software Installation"
-  ansible.builtin.debug:
+  debug:
     var:                install_xe.stdout_lines
   when:                 install_xe.stdout_lines is defined
 
@@ -82,16 +61,18 @@
 # ------------------------------------------------------------------------------
 
 - name:                 "Verifies existence of Configuration Script"
-  ansible.builtin.stat:
+  stat:
     path:               "{{ configure_script }}"
   register:             configure_script_stat
 
 - name:                 "Perform a silent configuration of XE database"
-  ansible.builtin.expect:
+  expect:
     command:            "{{ configure_script }} configure"
     creates:            /opt/oracle/oradata/XE
+    timeout:            null
     responses:
-      (?i)password:     "{{ pw_all }}"
+      (?i)accounts:     "{{ xe_password }}"
+      (?i)password:     "{{ xe_password }}"
   become:               yes
   become_user:          root
   register:             configure_xe
@@ -100,7 +81,7 @@
   -                     configure_script_stat.stat.exists
   
 - name:                 "Display output from XE Configuration"
-  ansible.builtin.debug:
+  debug:
     var:                configure_xe.stdout_lines
   when:                 configure_xe.stdout_lines is defined
 
@@ -109,16 +90,16 @@
 # ------------------------------------------------------------------------------
 
 - name:                 "Configure the firewall"
-  ansible.posix.firewalld:
+  firewalld:
     permanent:          yes
     port:               "{{ item }}"
     state:              enabled
     zone:               public
   with_items:
-    -                   "1521/TCP"
-    -                   "1521/UDP"
-    -                   "5500/TCP"
-    -                   "5500/UDP"
+    -                   "1521/tcp"
+    -                   "1521/udp"
+    -                   "5500/tcp"
+    -                   "5500/udp"
   become:               yes
   become_user:          root
 
@@ -127,7 +108,7 @@
 # ------------------------------------------------------------------------------
 
 - name:                 "Automating Shutdown and Startup"
-  ansible.builtin.systemd:
+  systemd:
     daemon_reload:      True
     name:               oracle-xe-18c
     enabled:            True
@@ -141,7 +122,7 @@
 # ------------------------------------------------------------------------------
 
 - name:                 "Check for existence of Oracle User Home"
-  ansible.builtin.stat:
+  stat:
     path:               "{{ oracle_user_home }}"
   register:             oracle_user_home_stat
 
@@ -149,7 +130,7 @@
   block:
 
   - name:               "Create files for silent installation"
-    ansible.builtin.template:
+    template:
       src:              "{{ item.dest | basename  }}.j2"
       dest:             "{{ item.dest }}"
       mode:             "{{ item.mode }}"
@@ -157,13 +138,13 @@
     - { dest: "{{ enable_em_script }}", mode: "0700" }
 
   - name:               "Run script to enable EM Express for external clients"
-    ansible.builtin.command:
+    command:
       argv:
       -                 "{{ enable_em_script }}"
     register:           enable_em_script_out
 
   - name:               "Display output from enable EM Express script"
-    ansible.builtin.debug:
+    debug:
       var:              enable_em_script_out.stdout_lines
     when:               enable_em_script_out.stdout_lines is defined
     

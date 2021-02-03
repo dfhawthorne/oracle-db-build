@@ -1,0 +1,69 @@
+---
+# ------------------------------------------------------------------------------
+# Oracle Linux 7 specific tasks
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Install Python PEXPECT modules
+# ------------------------------------------------------------------------------
+
+- name:                "Ensure old version of PEXPECT is not installed"
+  yum:
+    name:               pexpect
+    state:              absent
+  become:               yes
+  become_user:          root
+
+- name:                 "Copy PIP2 validation script to remote host"
+  copy:
+    src:                files/validate_pip2.sh
+    dest:               /tmp/validate_pip2.sh
+    mode:               '0700'
+
+- name:                 "Validate PIP2 installation"
+  command:
+    argv:
+      -                 /tmp/validate_pip2.sh
+  register:             check_pip2
+  failed_when:          false
+  changed_when:         false
+
+- name:                 "Display output from PIP2 validation"
+  debug:
+    var:                check_pip2
+  when:                 check_pip2 is defined
+  
+- name:                 "Download and install fix for PIP2"
+  block:
+  
+  - name:               "Download fix for PIP2"
+    get_url:
+      dest:             /tmp/get-pip.py
+      url:              "https://bootstrap.pypa.io/2.7/get-pip.py"
+      mode:             '0700'
+
+  - name:               "Install correct version of PIP2"
+    command:
+      argv:
+        -               /tmp/get-pip.py
+    become:             yes
+    become_user:        root
+    register:           install_pip2
+
+  - name:               "Display output from PIP2 installation"
+    debug:
+      var:              install_pip2.stdout_lines
+    when:               install_pip2.stdout_lines is defined
+
+  when:
+    -                   check_pip2.rc is defined
+    -                   check_pip2.rc > 0
+
+- name:                 "Use PIP to install PEXPECT on OL 7+ systems"
+  pip:
+    name:               pexpect
+    state:              latest
+  become:               yes
+  become_user:          root
+
+...

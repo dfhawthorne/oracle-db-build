@@ -8,7 +8,7 @@ export ORACLE_SID=XE
 export ORACLE_HOME=/opt/oracle/product/18c/dbhomeXE
 export PATH=${ORACLE_HOME}/bin:${PATH}
 
-sqlplus -L system/{{ pw_all }} <<DONE
+sqlplus -L system/{{ xe_password }} <<DONE
 EXEC DBMS_XDB.SETLISTENERLOCALACCESS(FALSE);
 EXIT
 DONE

@@ -1,0 +1,7 @@
+extends: relaxed
+rules:
+  line-length: disable
+  trailing-spaces: disable
+  colons: disable
+  indentation: disable
+  hyphens: disable
