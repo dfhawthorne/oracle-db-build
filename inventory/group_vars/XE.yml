@@ -3,4 +3,6 @@
 # Configuration for XE database
 # ------------------------------------------------------------------------------
 
+ansible_python_interpreter:
+                        "/usr/bin/python2.7"
 ...

@@ -113,6 +113,23 @@
       -                 autofs_master.stat.exists
 
 # ------------------------------------------------------------------------------
+# Configure the firewall for Oracle Listener
+# ------------------------------------------------------------------------------
+
+  - name:               "Configure the firewall for Oracle Listener"
+    firewalld:
+      permanent:        yes
+      port:             "{{ item }}"
+      state:            enabled
+      zone:             public
+    with_items:
+      -                 "1521/tcp"
+      -                 "1521/udp"
+    become:             yes
+    become_user:        root
+    notify:             "Reload FireWall Rules"
+
+# ------------------------------------------------------------------------------
 # Include any OS specific tasks
 # ------------------------------------------------------------------------------
 
@@ -149,4 +166,11 @@
     become:             yes
     become_user:        root
 
+  - name:               "Reload FireWall Rules"
+    command:
+      argv:
+        -               firewall-cmd
+        -               "--reload"
+    become:             yes
+    become_user:        root
 ...

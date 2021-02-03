@@ -86,22 +86,21 @@
   when:                 configure_xe.stdout_lines is defined
 
 # ------------------------------------------------------------------------------
-# Configure the firewall
+# Configure the firewall for Enterprise Manager Express
 # ------------------------------------------------------------------------------
 
-- name:                 "Configure the firewall"
+- name:                 "Configure the firewall for Enterprise Manager Express"
   firewalld:
     permanent:          yes
     port:               "{{ item }}"
     state:              enabled
     zone:               public
   with_items:
-    -                   "1521/tcp"
-    -                   "1521/udp"
     -                   "5500/tcp"
     -                   "5500/udp"
   become:               yes
   become_user:          root
+  notify:              "Reload FireWall Rules"
 
 # ------------------------------------------------------------------------------
 # Automating Shutdown and Startup
