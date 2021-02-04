@@ -3,9 +3,20 @@
 # Installs and configures a 19C database
 # ------------------------------------------------------------------------------
 
-- name:               "Set global variables"
+# ------------------------------------------------------------------------------
+# Only support Oracle RDBMS 19C on Oracle Linux 7+
+# ------------------------------------------------------------------------------
+
+- name:                 "Only support Oracle RDBMS 19C on Oracle Linux 7+"
+  assert:
+    msg:                "Only support Oracle RDBMS 19C on Oracle Linux 7+"
+    that:  
+      -                 ansible_distribution == "OracleLinux"
+      -                 ansible_distribution_major_version >= '7'
+
+- name:                 "Set global variables"
   set_fact:
-    response_file:    "{{ oracle_user_home }}/db_install.rsp"
+    response_file:      "{{ oracle_user_home }}/db_install.rsp"
 
 # ----------------------------------------------------------------------------
 # The Oracle preinstallation RPM should only be installed once, even if
@@ -13,263 +24,259 @@
 #   configuration.
 # ----------------------------------------------------------------------------
 
-- name:               "Install Oracle Preinstallation RPM"
+- name:                 "Install Oracle Preinstallation RPM"
   yum:
-    name:             "{{ pre_install_rpm }}"
-    state:            present
-  become:             yes
-  become_user:        root
+    name:               "{{ pre_install_rpm }}"
+    state:              present
+  become:               yes
+  become_user:          root
 
-- name:               "Create files for silent installation"
+- name:                 "Create files for silent installation"
   template:
-    src:              "{{ item.dest | basename  }}.j2"
-    dest:             "{{ item.dest }}"
-    mode:             "{{ item.mode }}"
-  become:             yes
-  become_user:        oracle
+    src:                "{{ item.dest | basename  }}.j2"
+    dest:               "{{ item.dest }}"
+    mode:               "{{ item.mode }}"
+  become:               yes
+  become_user:          oracle
   with_items:
   - { dest: "{{ response_file }}", mode: "0600" }
   - { dest: "{{ sw_installer }}", mode: "0700" }
   - { dest: "{{ config_tools }}", mode: "0700" }
   - { dest: "{{ apply_patches }}", mode: "0700" }
 
-- name:               "Create directory for Installation Software"
+- name:                 "Create directory for Installation Software"
   file:
-    name:             "{{ oracle_home }}"
-    group:            "{{ install_group }}"
-    owner:            oracle
-    state:            directory
-    mode:             0775
-  become:             yes
-  become_user:        root
+    name:               "{{ oracle_home }}"
+    group:              "{{ install_group }}"
+    owner:              oracle
+    state:              directory
+    mode:               0775
+  become:               yes
+  become_user:          root
 
-- name:               "Checks the existence of {{ oracle_home }}"
+- name:                 "Checks the existence of {{ oracle_home }}"
   stat:
-    path:             "{{ oracle_home }}"
-  register:           oracle_home_path
+    path:               "{{ oracle_home }}"
+  register:             oracle_home_path
 
-- name:               "Extract the Oracle Software Installer"
+- name:                 "Extract the Oracle Software Installer"
   unarchive:
-    creates:          "{{ oracle_home }}/runInstaller"
-    dest:             "{{ oracle_home }}"
-    group:            "{{ install_group }}"
-    owner:            oracle
-    remote_src:       yes
-    src:              "{{ sw_archive }}"
-  become:             yes
-  become_user:        oracle
+    creates:            "{{ oracle_home }}/runInstaller"
+    dest:               "{{ oracle_home }}"
+    group:              "{{ install_group }}"
+    owner:              oracle
+    remote_src:         yes
+    src:                "{{ sw_archive }}"
+  become:               yes
+  become_user:          oracle
   when:
-  -                   oracle_home_path.stat is defined
-  -                   oracle_home_path.stat.exists
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
 
-- name:               "Create directory for Patches"
+- name:                 "Create directory for Patches"
   file:
-    name:             "{{ oracle_home }}/patch"
-    group:            "{{ install_group }}"
-    owner:            oracle
-    state:            directory
-    mode:             0775
-  become:             yes
-  become_user:        oracle
+    name:               "{{ oracle_home }}/patch"
+    group:              "{{ install_group }}"
+    owner:              oracle
+    state:              directory
+    mode:               0775
+  become:               yes
+  become_user:          oracle
   when:
-  -                   oracle_home_path.stat is defined
-  -                   oracle_home_path.stat.exists
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
 
-- name:               "Extract the patches"
+- name:                 "Extract the patches"
   unarchive:
-    creates:          "{{ patch_directory }}"
-    dest:             "{{ oracle_home }}/patch"
-    group:            "{{ install_group }}"
-    owner:            oracle
-    remote_src:       yes
-    src:              "{{ patch_archive }}"
-  become:             yes
-  become_user:        oracle
+    creates:            "{{ patch_directory }}"
+    dest:               "{{ oracle_home }}/patch"
+    group:              "{{ install_group }}"
+    owner:              oracle
+    remote_src:         yes
+    src:                "{{ patch_archive }}"
+  become:               yes
+  become_user:          oracle
   when:
-  -                   oracle_home_path.stat is defined
-  -                   oracle_home_path.stat.exists
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
 
-- name:               "Check existence of OPatch"
+- name:                 "Check existence of OPatch"
   stat:
-    path:             "{{ opatch_bin }}"
-  register:           opatch
-  become:             yes
-  become_user:        oracle
+    path:               "{{ opatch_bin }}"
+  register:             opatch
+  become:               yes
+  become_user:          oracle
 
-- name:               "Check if db s/w has been installed"
+- name:                 "Check if db s/w has been installed"
   command:
     argv:
-      -               "{{ opatch_bin }}"
-      -               lsinventory
-      -               "-oh"
-      -               "{{ oracle_home }}"
-  failed_when:        false
-  changed_when:       false
-  register:           db_sw_installed
-  become:             yes
-  become_user:        oracle
+      -                 "{{ opatch_bin }}"
+      -                 lsinventory
+      -                 "-oh"
+      -                 "{{ oracle_home }}"
+  failed_when:          false
+  changed_when:         false
+  register:             db_sw_installed
+  become:               yes
+  become_user:          oracle
   when:
-  -                   opatch.stat is defined
-  -                   opatch.stat.exists
+  -                     opatch.stat is defined
+  -                     opatch.stat.exists
 
-- name:               "Display inventory listing for OH={{ oracle_home }}"
+- name:                 "Display inventory listing for OH={{ oracle_home }}"
   debug:
-    var:              db_sw_installed.stdout_lines
-  when:               db_sw_installed.stdout_lines is defined
+    var:                db_sw_installed.stdout_lines
+  when:                 db_sw_installed.stdout_lines is defined
 
-- name:               "Install Oracle DB Software in Silent Mode"
+- name:                 "Install Oracle DB Software in Silent Mode"
   command:
     argv:
-    -                 "{{ sw_installer }}"
-    chdir:            "{{ oracle_home }}"
-  register:           db_install_result
-  become:             yes
-  become_user:        oracle
-  failed_when:        false
+    -                   "{{ sw_installer }}"
+    chdir:              "{{ oracle_home }}"
+  register:             db_install_result
+  become:               yes
+  become_user:          oracle
+  failed_when:          false
   when:
-  -                   opatch.stat is defined
-  -                   opatch.stat.exists
-  -                   db_sw_installed.stdout is defined
-  -                   db_sw_installed.stdout is not search("Oracle Database 19c")
-  -                   oracle_home_path.stat is defined
-  -                   oracle_home_path.stat.exists
+  -                     opatch.stat is defined
+  -                     opatch.stat.exists
+  -                     db_sw_installed.stdout is defined
+  -                     db_sw_installed.stdout is not search("Oracle Database 19c")
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
 
-- name:               "Output from Install Oracle DB Software in Silent Mode"
+- name:                 "Output from Install Oracle DB Software in Silent Mode"
   debug:
-    var:              db_install_result.stdout_lines
-    verbosity:        0
-  when:               db_install_result.stdout_lines is defined
+    var:                db_install_result.stdout_lines
+  when:                 db_install_result.stdout_lines is defined
 
-- name:               "Run orainstRoot.sh after Oracle Database Software Installation"
+- name:                 "Run orainstRoot.sh after Oracle Database Software Installation"
   command:
     argv:
-    -                 "{{ inventory_location }}/orainstRoot.sh"
-  register:           orainstRoot
+    -                   "{{ inventory_location }}/orainstRoot.sh"
+  register:             orainstRoot
   when:
-  -                   db_install_result.stdout is defined
-  -                   db_install_result.stdout is search('/orainstRoot.sh')
-  become:             yes
-  become_user:        root
+  -                     db_install_result.stdout is defined
+  -                     db_install_result.stdout is search('/orainstRoot.sh')
+  become:               yes
+  become_user:          root
 
-- name:               "Output from orainstRoot.sh script"
+- name:                 "Output from orainstRoot.sh script"
   debug:
-    var:              orainstRoot.stdout_lines
-    verbosity:        0
-  when:               orainstRoot.stdout_lines is defined
+    var:                orainstRoot.stdout_lines
+  when:                 orainstRoot.stdout_lines is defined
 
-- name:               "Run root.sh after Oracle Database Software Installation"
+- name:                 "Run root.sh after Oracle Database Software Installation"
   command:
     argv:
-    -                 "{{ oracle_home }}/root.sh"
-  register:           db_root
+    -                   "{{ oracle_home }}/root.sh"
+  register:             db_root
   when:
-  -                   db_install_result.stdout is defined
-  -                   db_install_result.stdout is search('/root.sh')
-  become:             yes
-  become_user:        root
+  -                     db_install_result.stdout is defined
+  -                     db_install_result.stdout is search('/root.sh')
+  become:               yes
+  become_user:          root
 
-- name:               "Output from root.sh script"
+- name:                 "Output from root.sh script"
   debug:
-    var:              db_root.stdout_lines
-    verbosity:        0
-  when:               db_root.stdout_lines is defined
+    var:                db_root.stdout_lines
+  when:                 db_root.stdout_lines is defined
 
-- name:               "Complete the configuration"
+- name:                 "Complete the configuration"
   command:
     argv:
-    -                 "{{ oracle_home }}/runInstaller"
-    -                 "-executeConfigTools"
-    -                 "-responseFile"
-    -                 "{{ response_file }}"
-    -                 "-silent"
-  register:           executeConfigTools
+    -                   "{{ oracle_home }}/runInstaller"
+    -                   "-executeConfigTools"
+    -                   "-responseFile"
+    -                   "{{ response_file }}"
+    -                   "-silent"
+  register:             executeConfigTools
   when:
-  -                   db_install_result.stdout is defined
-  -                   db_install_result.stdout is search('-executeConfigTools')
-  become:             yes
-  become_user:        oracle
+  -                     db_install_result.stdout is defined
+  -                     db_install_result.stdout is search('-executeConfigTools')
+  become:               yes
+  become_user:          oracle
 
-- name:               "Output from executeConfigTools script"
+- name:                 "Output from executeConfigTools script"
   debug:
-    var:              executeConfigTools.stdout_lines
-    verbosity:        0
-  when:               executeConfigTools.stdout_lines is defined
+    var:                executeConfigTools.stdout_lines
+  when:                 executeConfigTools.stdout_lines is defined
 
-- name:               "Get current version of OPatch"
+- name:                 "Get current version of OPatch"
   command:
     argv:
-    -                 "{{ opatch_bin }}"
-    -                 version
-    chdir:            "{{ oracle_home }}/OPatch"
-  register:           opatch_vers_data
-  changed_when:       false
-  become:             yes
-  become_user:        oracle
+    -                   "{{ opatch_bin }}"
+    -                   version
+    chdir:              "{{ oracle_home }}/OPatch"
+  register:             opatch_vers_data
+  changed_when:         false
+  become:               yes
+  become_user:          oracle
   when:
-  -                   opatch.stat is defined
-  -                   opatch.stat.exists
-  -                   oracle_home_path.stat is defined
-  -                   oracle_home_path.stat.exists
+  -                     opatch.stat is defined
+  -                     opatch.stat.exists
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
 
-- name:               "Extract version of OPatch from command output"
+- name:                 "Extract version of OPatch from command output"
   set_fact:
-    opatch_version:   "{{ opatch_vers_data.stdout_lines[0].split(' ')[2] }}"
-  when:               opatch_vers_data.stdout_lines is defined
+    opatch_version:     "{{ opatch_vers_data.stdout_lines[0].split(' ')[2] }}"
+  when:                 opatch_vers_data.stdout_lines is defined
 
-- name:               "Install latest version of OPatch (P6880880)"
+- name:                 "Install latest version of OPatch (P6880880)"
   unarchive:
-    dest:             "{{ oracle_home }}"
-    owner:            oracle
-    group:            "{{ install_group }}"
-    remote_src:       yes
-    src:              "{{ opatch_source }}"
-  become:             yes
-  become_user:        oracle
+    dest:               "{{ oracle_home }}"
+    owner:              oracle
+    group:              "{{ install_group }}"
+    remote_src:         yes
+    src:                "{{ opatch_source }}"
+  become:               yes
+  become_user:          oracle
   when:
-  -                   opatch_version is defined
-  -                   opatch_version is version(min_opatch_vers, operator='lt', strict=false)
+  -                     opatch_version is defined
+  -                     opatch_version is version(min_opatch_vers, operator='lt', strict=false)
 
-- name:               "Check if patches from {{ patch_directory }} hav been applied"
+- name:                 "Check if patches from {{ patch_directory }} hav been applied"
   command:
     argv:
-      -               "{{ opatch_bin }}"
-      -               lspatches
-      -               "-verify"
-      -               "-oh"
-      -               "{{ oracle_home }}"
-      -               "{{ patch_directory }}"
-  failed_when:        false
-  changed_when:       false
-  register:           patch_applied
-  become:             yes
-  become_user:        oracle
+      -                 "{{ opatch_bin }}"
+      -                 lspatches
+      -                 "-verify"
+      -                 "-oh"
+      -                 "{{ oracle_home }}"
+      -                 "{{ patch_directory }}"
+  failed_when:          false
+  changed_when:         false
+  register:             patch_applied
+  become:               yes
+  become_user:          oracle
   when:
-  -                   opatch.stat.exists
+  -                     opatch.stat.exists
 
-- name:               "Status of patches in Oracle Home"
+- name:                 "Status of patches in Oracle Home"
   debug:
-    var:              patch_applied.stdout_lines
-  when:               patch_applied.stdout_lines is defined
+    var:                patch_applied.stdout_lines
+  when:                 patch_applied.stdout_lines is defined
 
-- name:               "Patch Oracle DB Software"
+- name:                 "Patch Oracle DB Software"
   command:
     argv:
-    -                 "{{ apply_patches }}"
-    chdir:            "{{ oracle_home }}"
-  failed_when:        false
-  register:           opatch_apply
+    -                   "{{ apply_patches }}"
+    chdir:              "{{ oracle_home }}"
+  failed_when:          false
+  register:             opatch_apply
   when:
-  -                   opatch.stat is defined
-  -                   opatch.stat.exists
-  -                   oracle_home_path.stat is defined
-  -                   oracle_home_path.stat.exists
-  -                   patch_applied.stdout is defined
-  -                   patch_applied.stdout is search(' NOT registered in Oracle Home')
-  become:             yes
-  become_user:        oracle
+  -                     opatch.stat is defined
+  -                     opatch.stat.exists
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
+  -                     patch_applied.stdout is defined
+  -                     patch_applied.stdout is search(' NOT registered in Oracle Home')
+  become:               yes
+  become_user:          oracle
 
-- name:               "Output from apply of patches into Oracle Home"
+- name:                 "Output from apply of patches into Oracle Home"
   debug:
-    var:              opatch_apply.stdout_lines
-  when:               opatch_apply.stdout_lines is defined
+    var:                opatch_apply.stdout_lines
+  when:                 opatch_apply.stdout_lines is defined
 ...

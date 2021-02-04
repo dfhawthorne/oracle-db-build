@@ -3,11 +3,14 @@
 # Oracle database hosts
 # ------------------------------------------------------------------------------
 
-V19C:
-  hosts:
-    dural.yaocm.id.au
-
-XE:
-  hosts:
-    xe.yaocm.id.au
+all:
+  children:
+    V19C:
+      hosts:
+        dural.yaocm.id.au:
+        goldengate1.yaocm.id.au:
+        goldengate2.yaocm.id.au:
+    XE:
+      hosts:
+        xe.yaocm.id.au:
 ...

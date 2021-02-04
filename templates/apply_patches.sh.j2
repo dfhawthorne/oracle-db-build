@@ -1,0 +1,60 @@
+#!/usr/bin/bash
+# ------------------------------------------------------------------------------
+# Patches Oracle RDBMS 19.3 Under OL 8
+# Implements recommendation from MOS Doc 2668780.1
+# Ref: Oracle Recommended Patches -- "Oracle JavaVM Component Database PSU and Update" (OJVM PSU and OJVM Update) Patches (Doc ID 1929745.1)
+# ------------------------------------------------------------------------------
+
+export ORACLE_SID={{ SID }}
+export ORACLE_HOME={{ oracle_home }}
+
+export PATH={{ oracle_home }}/bin:{{ oracle_home }}/OPatch:${PATH}
+
+# Stop all Oracle processes
+
+sqlplus -S -L / as sysdba <<DONE
+shutdown immediate
+exit
+DONE
+
+lsnrctl stop
+
+# Apply DB RU
+
+pushd {{ patch_directory }}/31771877
+
+opatch prereq CheckConflictAgainstOHWithDetail -ph . \
+    || exit 1
+
+opatch apply -silent \
+    || exit 1
+
+# Apply JavaVM RU
+
+pushd {{ patch_directory }}/31668882
+
+opatch prereq CheckConflictAgainstOHWithDetail -ph . \
+    || exit 1
+
+opatch apply -silent \
+    || exit 1
+
+# Post-apply steps
+
+sqlplus /nolog <<DONE
+Connect / as sysdba
+startup upgrade
+alter pluggable database all open upgrade;
+quit
+DONE
+
+datapatch -verbose \
+    || exit 1
+
+sqlplus /nolog <<DONE	
+Connect / as sysdba
+shutdown
+startup
+alter pluggable database all open;
+quit
+DONE

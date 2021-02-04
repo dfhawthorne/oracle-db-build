@@ -7,6 +7,7 @@ oracle_user_home:       "/home/oracle"
 nfs_software_dir:       "/opt/share/Software"
 nfs_software_loc:       "192.168.1.253:/data/Software"
 auto_direct:            "/etc/auto.direct"
+opatch_bin:             "{{ oracle_home }}/OPatch/opatch"
 
 # ------------------------------------------------------------------------------
 # Oracle Software Installation Options
@@ -23,4 +24,16 @@ osdba_group:            "dba"
 
 dataLocation:           "{{ oracle_base }}/oradata"
 recoveryLocation:       "{{ oracle_base }}/recoveryarea"
+
+# ------------------------------------------------------------------------------
+# Auxiliary scripts
+# ------------------------------------------------------------------------------
+
+sw_installer:           "{{ oracle_user_home }}/install_rdbms.sh"
+config_tools:           "{{ oracle_user_home }}/config_rdbms.sh"
+apply_patches:          "{{ oracle_user_home }}/apply_patches.sh"
+start_listener:         "{{ oracle_user_home }}/start_listener.sh"
+start_db_inst:          "{{ oracle_user_home }}/start_db_inst.py"
+shutdown_db:            "{{ oracle_user_home }}/shutdown_db.sh"
+
 ...

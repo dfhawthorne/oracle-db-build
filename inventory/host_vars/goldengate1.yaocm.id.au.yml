@@ -1,0 +1,14 @@
+---
+# ------------------------------------------------------------------------------
+# Host specific variables for GOLDENGATE1
+# ------------------------------------------------------------------------------
+
+install_option:         "INSTALL_DB_AND_CONFIG"
+starterdb_type:         "GENERAL_PURPOSE"
+SID:                    "GG1V19C"
+PDBName:                "GG1A"
+characterSet:           "AL32UTF8"
+memoryLimit:            "3120"
+globalDBName:           "GG1CDB19C.YAOCM.ID.AU"
+
+...

@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+# ------------------------------------------------------------------------------
+# Configures Oracle RDBMS 19.3 Under OL 8
+# Implements recommendation from MOS Doc 2668780.1
+# ------------------------------------------------------------------------------
+
+export CV_ASSUME_DISTID=OL7
+
+{{ oracle_home }}/runInstaller          \
+  -executeConfigTools                   \
+  -responseFile \"{{ response_file }}\" \
+  -silent                               \
+  -waitforcompletion

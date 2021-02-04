@@ -8,7 +8,7 @@
   tasks:
 
 # ------------------------------------------------------------------------------
-# Only support Ansible 2.10+ and Oracle Linux 8+
+# Only support Ansible 2.10+ on Oracle Linux 8+
 # ------------------------------------------------------------------------------
 
   - name:               "Only support Ansible 2.10+ if running on OL 8+"

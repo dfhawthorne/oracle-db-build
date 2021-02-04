@@ -1,0 +1,12 @@
+---
+# ------------------------------------------------------------------------------
+# Host specific variables for GOLDENGATE2
+# ------------------------------------------------------------------------------
+
+starterdb_type:         "GENERAL_PURPOSE"
+SID:                    "GG2V19C"
+PDBName:                "GG2A"
+characterSet:           "AL32UTF8"
+memoryLimit:            "3120"
+globalDBName:           "GG2CDB19C.YAOCM.ID.AU"
+...

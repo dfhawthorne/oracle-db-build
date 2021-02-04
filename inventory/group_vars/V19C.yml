@@ -5,9 +5,9 @@
 
 pre_install_rpm:        "oracle-database-preinstall-19c"
 oracle_home:            "{{ oracle_base }}/product/19.3.0.2/database"
-sw_archive:             "{{ nfs_loc }}/database/LINUX.X64_193000_db_home.zip"
-patch_archive:          "{{ nfs_loc }}/Patches/p31720396_190000_Linux-x86-64.zip"
+sw_archive:             "{{ nfs_software_dir }}/database/LINUX.X64_193000_db_home.zip"
+patch_archive:          "{{ nfs_software_dir }}/Patches/p31720396_190000_Linux-x86-64.zip"
 min_opatch_vers:        '12.2.0.1.19'
 patch_directory:        "{{ oracle_home }}/patch/31720396"
-opatch_source:          "/opt/share/Software/OPatch/p6880880_190000_Linux-x86-64.zip"
+opatch_source:          "{{ nfs_software_dir }}/OPatch/p6880880_190000_Linux-x86-64.zip"
 ...
