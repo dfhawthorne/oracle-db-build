@@ -4,6 +4,7 @@
 # ------------------------------------------------------------------------------
 
 starterdb_type:         "GENERAL_PURPOSE"
+install_option:         "INSTALL_DB_AND_CONFIG"
 SID:                    "GG2V19C"
 PDBName:                "GG2A"
 characterSet:           "AL32UTF8"

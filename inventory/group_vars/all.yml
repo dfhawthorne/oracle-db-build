@@ -31,7 +31,7 @@ recoveryLocation:       "{{ oracle_base }}/recoveryarea"
 
 sw_installer:           "{{ oracle_user_home }}/install_rdbms.sh"
 config_tools:           "{{ oracle_user_home }}/config_rdbms.sh"
-apply_patches:          "{{ oracle_user_home }}/apply_patches.sh"
+apply_patches:          "{{ oracle_user_home }}/apply_rdbms_patches.sh"
 start_listener:         "{{ oracle_user_home }}/start_listener.sh"
 start_db_inst:          "{{ oracle_user_home }}/start_db_inst.py"
 shutdown_db:            "{{ oracle_user_home }}/shutdown_db.sh"

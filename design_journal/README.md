@@ -12,3 +12,4 @@ Prof. Fred Brooks recommends that one keep a journal of design decisions in orde
 - [2021-02-03](2021_02_03.md): Successful 18C XE Installation
 - [2021-02-04](2021_02_04.md): Cleanup of 18C XE Installation
 - [2021-02-05](2021_02_05.md): Successful 19C EE Installation
+- [2021-02-10](2021_02_10.md): Minor Revisions to 19C EE Installation

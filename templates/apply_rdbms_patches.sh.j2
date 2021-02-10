@@ -58,3 +58,12 @@ startup
 alter pluggable database all open;
 quit
 DONE
+
+# Recompile Invalid Objects
+
+sqlplus /nolog <<DONE	
+Connect / as sysdba
+@?/rdbms/admin/utlrp
+quit
+DONE
+
