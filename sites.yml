@@ -1,0 +1,12 @@
+---
+# ------------------------------------------------------------------------------
+# Installs and configures an Oracle database
+# ------------------------------------------------------------------------------
+
+- name:                 "Installs and configures an Oracle database"
+  hosts:                all
+  tasks:
+
+  - name:               "Main workflow"
+    ansible.builtin.include_tasks: install_oracle_rdbms.yml
+...

@@ -3,21 +3,27 @@
 # Installs and configures an Oracle database
 # ------------------------------------------------------------------------------
 
-- name:                 "Installs and configures an Oracle database"
-  hosts:                all
-  tasks:
-
 # ------------------------------------------------------------------------------
 # Only support Ansible 2.10+ on Oracle Linux 8+
 # ------------------------------------------------------------------------------
 
-  - name:               "Only support Ansible 2.10+ if running on OL 8+"
-    assert:
-      msg:              "Only support Ansible 2.10+ if running on OL 8+"
-      that: >
+- name:                 "Only support Ansible 2.10+ if running on OL 8+"
+  ansible.builtin.assert:
+    fail_msg:           "Only support Ansible 2.10+ if running on OL 8+"
+    that: >
                         ansible_version.full is version('2.10.0', '<') or 
                         (ansible_distribution == "OracleLinux" and
                         ansible_distribution_major_version >= '8')
+
+# --------------------------------------------------------------------------
+  # Set the hostname after the VM had been built in the XEN server farm
+  # --------------------------------------------------------------------------
+
+- name:                 "Set host name"
+  ansible.builtin.hostname:
+    name:               "{{ inventory_hostname }}"
+  become:               yes
+  become_user:          root
 
 # ----------------------------------------------------------------------------
 # Load passwords from passwords/oracle.yml which has the following variables:
@@ -29,116 +35,132 @@
 # >>>>>>> This file is deliberately NOT included in the GIT repository <<<<<<<
 # ----------------------------------------------------------------------------
 
-  - name:               "Load passwords"
-    include_vars:
-      file:             "passwords/oracle.yml"
-    no_log:             true
+- name:                 "Load passwords"
+  ansible.builtin.include_vars:
+    file:               "passwords/oracle.yml"
+  no_log:               true
+
+# -----------------------------------------------------------------------------
+# Load global variables for installation of Oracle RDBMS
+# -----------------------------------------------------------------------------
+
+- name:                 "Load variables for installation of Oracle RDBMS"
+  ansible.builtin.include_vars:
+    file:               "global_vars.yml"
+
+# -----------------------------------------------------------------------------
+# Load variables for installation of particular Oracle RDBMS version
+# -----------------------------------------------------------------------------
+
+- name:                 "Load variables for installation of particular Oracle RDBMS version"
+  ansible.builtin.include_vars:
+    file:               "{{ oracle_rdbms_version }}.yml"
 
 # ------------------------------------------------------------------------------
 # Create an auto-mounted directory of database software
 # ------------------------------------------------------------------------------
 
-  - name:               "Install minimal packages"
-    yum:
-      name:
-        -               nscd
-        -               autofs
-        -               nfs-utils
-      state:            present
-    become:             yes
-    become_user:        root
+- name:                 "Install minimal packages"
+  ansible.builtin.yum:
+    name:
+      -                 nscd
+      -                 autofs
+      -                 nfs-utils
+    state:              present
+  become:               yes
+  become_user:          root
 
-  - name:               "Create mount point"
-    file:
-      path:             "{{ nfs_software_dir }}"
-      state:            directory
-      mode:             0775
-    become:             yes
-    become_user:        root
+- name:                 "Create mount point"
+  ansible.builtin.file:
+    path:               "{{ nfs_software_dir }}"
+    state:              directory
+    mode:               0775
+  become:               yes
+  become_user:          root
 
-  - name:               "Remove NFS mount point"
-    mount:
-      path:             "{{ nfs_software_dir }}"
-      state:            absent
-    become:             yes
-    become_user:        root
+- name:                 "Remove NFS mount point"
+  ansible.posix.mount:
+    path:               "{{ nfs_software_dir }}"
+    state:              absent
+  become:               yes
+  become_user:          root
 
-  - name:               "Check for existence of AutoFS master file"
-    stat:
-      path:             /etc/auto.master
-    register:           autofs_master
+- name:                 "Check for existence of AutoFS master file"
+  ansible.builtin.stat:
+    path:               /etc/auto.master
+  register:             autofs_master
 
-  - name:               "Point to {{ auto_direct }}"
-    lineinfile:
-      path:             /etc/auto.master
-      regexp:           '^/-'
-      insertafter:      EOF
-      line:             "/-      {{ auto_direct }}"
-      state:            present
-    become:             yes
-    become_user:        root
-    notify:             Restart AutoFS service
-    when:
-      -                 autofs_master.stat is defined
-      -                 autofs_master.stat.exists
+- name:                 "Point to {{ auto_direct }}"
+  ansible.builtin.lineinfile:
+    path:               /etc/auto.master
+    regexp:             '^/-'
+    insertafter:        EOF
+    line:               "/-      {{ auto_direct }}"
+    state:              present
+  become:               yes
+  become_user:          root
+  notify:               Restart AutoFS service
+  when:
+    -                   autofs_master.stat is defined
+    -                   autofs_master.stat.exists
 
-  - name:               "AutoFS mount points"
-    lineinfile:
-      path:             "{{ auto_direct }}"
-      regexp:           "^{{ nfs_software_dir }}"
-      insertafter:      EOF
-      line:             "{{ nfs_software_dir }}      {{ nfs_software_loc }}"
-      create:           TRUE
-      state:            present
-      mode:             0644
-    become:             yes
-    become_user:        root
-    notify:             Restart AutoFS service
-    when:
-      -                 autofs_master.stat is defined
-      -                 autofs_master.stat.exists
+- name:                 "AutoFS mount points"
+  ansible.builtin.lineinfile:
+    path:               "{{ auto_direct }}"
+    regexp:             "^{{ nfs_software_dir }}"
+    insertafter:        EOF
+    line:               "{{ nfs_software_dir }}      {{ nfs_software_loc }}"
+    create:             TRUE
+    state:              present
+    mode:               0644
+  become:               yes
+  become_user:          root
+  notify:               Restart AutoFS service
+  when:
+    -                   autofs_master.stat is defined
+    -                   autofs_master.stat.exists
 
-  - name:               "Restart AutoFS service if config files changed"
-    meta:               flush_handlers
+- name:                 "Restart AutoFS service if config files changed"
+  ansible.builtin.meta: flush_handlers
 
-  - name:               "Enable AUTOFS service"
-    service:
-      name:             autofs
-      enabled:          yes
-      state:            started
-    become:             yes
-    become_user:        root
-    when:
-      -                 autofs_master.stat is defined
-      -                 autofs_master.stat.exists
+- name:                 "Enable AUTOFS service"
+  ansible.builtin.service:
+    name:               autofs
+    enabled:            yes
+    state:              started
+  become:               yes
+  become_user:          root
+  when:
+    -                   autofs_master.stat is defined
+    -                   autofs_master.stat.exists
 
 # ------------------------------------------------------------------------------
 # Configure the firewall for Oracle Listener
 # ------------------------------------------------------------------------------
 
-  - name:               "Configure the firewall for Oracle Listener"
-    firewalld:
-      permanent:        yes
-      port:             "{{ item }}"
-      state:            enabled
-      zone:             public
-    with_items:
-      -                 "1521/tcp"
-      -                 "1521/udp"
-    become:             yes
-    become_user:        root
-    notify:             "Reload FireWall Rules"
+- name:                 "Configure the firewall for Oracle Listener"
+  ansible.posix.firewalld:
+    permanent:          yes
+    port:               "{{ item }}"
+    state:              enabled
+    zone:               public
+  with_items:
+    -                   "1521/tcp"
+    -                   "1521/udp"
+  become:               yes
+  become_user:          root
+  notify:               "Reload FireWall Rules"
 
 # ------------------------------------------------------------------------------
 # Include any OS specific tasks
 # ------------------------------------------------------------------------------
 
-  - name:               "Run Oracle Linux 7 specific tasks"
-    include_tasks:
-      file:             ol7_tasks.yml
-    when:
-      -                 ansible_distribution == "OracleLinux"
-      -                 ansible_distribution_major_version == '7'
+- name:                 "Run Oracle Linux 7 specific tasks"
+  ansible.builtin.include_tasks:
+    file:               ol7_tasks.yml
+  when:
+    -                   ansible_distribution == "OracleLinux"
+    -                   ansible_distribution_major_version == '7'
 
 # ------------------------------------------------------------------------------
 # Use the Ansible group name to determine what script to follow.
@@ -146,31 +168,10 @@
 # servers.
 # ------------------------------------------------------------------------------
 
-  - name:               "Install a specific version of the database software"
-    include_tasks:
-      file:             "install_{{ group_names[0] }}_database.yml"
-    when:
-      -                 autofs_master.stat is defined
-      -                 autofs_master.stat.exists
-
-# ------------------------------------------------------------------------------
-# Handlers
-# ------------------------------------------------------------------------------
-
-  handlers:
-
-  - name:               "Restart AutoFS service"
-    service:
-      name:             autofs
-      state:            restarted
-    become:             yes
-    become_user:        root
-
-  - name:               "Reload FireWall Rules"
-    command:
-      argv:
-        -               firewall-cmd
-        -               "--reload"
-    become:             yes
-    become_user:        root
+- name:                 "Install a specific version of the database software"
+  ansible.builtin.include_tasks:
+    file:               "install_{{ oracle_rdbms_version }}_database.yml"
+  when:
+    -                   autofs_master.stat is defined
+    -                   autofs_master.stat.exists
 ...

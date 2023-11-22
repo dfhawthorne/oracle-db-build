@@ -8,6 +8,8 @@ all:
     V19C:
       hosts:
         dural.yaocm.id.au:
+    goldengate:
+      hosts:
         goldengate1.yaocm.id.au:
         goldengate2.yaocm.id.au:
     XE:

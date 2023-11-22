@@ -136,7 +136,7 @@
   register:             db_install_result
   become:               yes
   become_user:          oracle
-  failed_when:          false
+  failed_when:          "'[FATAL]' in db_install_result.stderr"
   when:
   -                     opatch.stat is defined
   -                     opatch.stat.exists

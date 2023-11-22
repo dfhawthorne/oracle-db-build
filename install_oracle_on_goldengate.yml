@@ -1,0 +1,32 @@
+---
+# ------------------------------------------------------------------------------
+# Install Oracle on GoldenGate servers only
+# ------------------------------------------------------------------------------
+
+- hosts:                 goldengate
+  tasks:
+
+  - name:               "Main workflow"
+    ansible.builtin.include_tasks: install_oracle_rdbms.yml
+
+  # ------------------------------------------------------------------------------
+  # Handlers
+  # ------------------------------------------------------------------------------
+
+  handlers:
+
+    - name:             "Restart AutoFS service"
+      ansible.builtin.service:
+        name:           autofs
+        state:          restarted
+      become:           yes
+      become_user:      root
+
+    - name:             "Reload FireWall Rules"
+      ansible.builtin.command:
+        argv:
+          -             firewall-cmd
+          -             "--reload"
+      become:           yes
+      become_user:      root
+...
