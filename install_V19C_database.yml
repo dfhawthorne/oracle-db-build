@@ -8,14 +8,14 @@
 # ------------------------------------------------------------------------------
 
 - name:                 "Only support Oracle RDBMS 19C on Oracle Linux 7+"
-  assert:
+  ansible.builtin.assert:
     msg:                "Only support Oracle RDBMS 19C on Oracle Linux 7+"
     that:  
       -                 ansible_distribution == "OracleLinux"
       -                 ansible_distribution_major_version >= '7'
 
 - name:                 "Set global variables"
-  set_fact:
+  ansible.builtin.set_fact:
     response_file:      "{{ oracle_user_home }}/db_install.rsp"
 
 # ----------------------------------------------------------------------------
@@ -25,14 +25,14 @@
 # ----------------------------------------------------------------------------
 
 - name:                 "Install Oracle Preinstallation RPM"
-  yum:
+  ansible.builtin.yum:
     name:               "{{ pre_install_rpm }}"
     state:              present
   become:               yes
   become_user:          root
 
 - name:                 "Create files for silent installation"
-  template:
+  ansible.builtin.template:
     src:                "{{ item.dest | basename  }}.j2"
     dest:               "{{ item.dest }}"
     mode:               "{{ item.mode }}"
@@ -41,11 +41,11 @@
   with_items:
   - { dest: "{{ response_file }}", mode: "0600" }
   - { dest: "{{ sw_installer }}", mode: "0700" }
-  - { dest: "{{ config_tools }}", mode: "0700" }
+  - { dest: "{{ config_rdbms }}", mode: "0700" }
   - { dest: "{{ apply_patches }}", mode: "0700" }
 
 - name:                 "Create directory for Installation Software"
-  file:
+  ansible.builtin.file:
     name:               "{{ oracle_home }}"
     group:              "{{ install_group }}"
     owner:              oracle
@@ -55,12 +55,12 @@
   become_user:          root
 
 - name:                 "Checks the existence of {{ oracle_home }}"
-  stat:
+  ansible.builtin.stat:
     path:               "{{ oracle_home }}"
   register:             oracle_home_path
 
 - name:                 "Extract the Oracle Software Installer"
-  unarchive:
+  ansible.builtin.unarchive:
     creates:            "{{ oracle_home }}/runInstaller"
     dest:               "{{ oracle_home }}"
     group:              "{{ install_group }}"
@@ -74,7 +74,7 @@
   -                     oracle_home_path.stat.exists
 
 - name:                 "Create directory for Patches"
-  file:
+  ansible.builtin.file:
     name:               "{{ oracle_home }}/patch"
     group:              "{{ install_group }}"
     owner:              oracle
@@ -87,7 +87,7 @@
   -                     oracle_home_path.stat.exists
 
 - name:                 "Extract the patches"
-  unarchive:
+  ansible.builtin.unarchive:
     creates:            "{{ patch_directory }}"
     dest:               "{{ oracle_home }}/patch"
     group:              "{{ install_group }}"
@@ -101,14 +101,14 @@
   -                     oracle_home_path.stat.exists
 
 - name:                 "Check existence of OPatch"
-  stat:
+  ansible.builtin.stat:
     path:               "{{ opatch_bin }}"
   register:             opatch
   become:               yes
   become_user:          oracle
 
 - name:                 "Check if db s/w has been installed"
-  command:
+  ansible.builtin.command:
     argv:
       -                 "{{ opatch_bin }}"
       -                 lsinventory
@@ -124,12 +124,12 @@
   -                     opatch.stat.exists
 
 - name:                 "Display inventory listing for OH={{ oracle_home }}"
-  debug:
+  ansible.builtin.debug:
     var:                db_sw_installed.stdout_lines
   when:                 db_sw_installed.stdout_lines is defined
 
 - name:                 "Install Oracle DB Software in Silent Mode"
-  command:
+  ansible.builtin.command:
     argv:
     -                   "{{ sw_installer }}"
     chdir:              "{{ oracle_home }}"
@@ -146,12 +146,17 @@
   -                     oracle_home_path.stat.exists
 
 - name:                 "Output from Install Oracle DB Software in Silent Mode"
-  debug:
+  ansible.builtin.debug:
     var:                db_install_result.stdout_lines
   when:                 db_install_result.stdout_lines is defined
 
+- name:                 "Errors from Install Oracle DB Software in Silent Mode"
+  ansible.builtin.debug:
+    var:                db_install_result.stderr_lines
+  when:                 db_install_result.stderr_lines is defined
+
 - name:                 "Run orainstRoot.sh after Oracle Database Software Installation"
-  command:
+  ansible.builtin.command:
     argv:
     -                   "{{ inventory_location }}/orainstRoot.sh"
   register:             orainstRoot
@@ -162,12 +167,12 @@
   become_user:          root
 
 - name:                 "Output from orainstRoot.sh script"
-  debug:
+  ansible.builtin.debug:
     var:                orainstRoot.stdout_lines
   when:                 orainstRoot.stdout_lines is defined
 
 - name:                 "Run root.sh after Oracle Database Software Installation"
-  command:
+  ansible.builtin.command:
     argv:
     -                   "{{ oracle_home }}/root.sh"
   register:             db_root
@@ -178,12 +183,12 @@
   become_user:          root
 
 - name:                 "Output from root.sh script"
-  debug:
+  ansible.builtin.debug:
     var:                db_root.stdout_lines
   when:                 db_root.stdout_lines is defined
 
 - name:                 "Complete the configuration"
-  command:
+  ansible.builtin.command:
     argv:
     -                   "{{ oracle_home }}/runInstaller"
     -                   "-executeConfigTools"
@@ -193,17 +198,18 @@
   register:             executeConfigTools
   when:
   -                     db_install_result.stdout is defined
-  -                     db_install_result.stdout is search('-executeConfigTools')
+  -                     "'-executeConfigTools' in db_install_result.stdout"
+  failed_when:          "'[FATAL]' in executeConfigTools.stderr"
   become:               yes
   become_user:          oracle
 
 - name:                 "Output from executeConfigTools script"
-  debug:
+  ansible.builtin.debug:
     var:                executeConfigTools.stdout_lines
   when:                 executeConfigTools.stdout_lines is defined
 
 - name:                 "Get current version of OPatch"
-  command:
+  ansible.builtin.command:
     argv:
     -                   "{{ opatch_bin }}"
     -                   version
@@ -219,12 +225,12 @@
   -                     oracle_home_path.stat.exists
 
 - name:                 "Extract version of OPatch from command output"
-  set_fact:
+  ansible.builtin.set_fact:
     opatch_version:     "{{ opatch_vers_data.stdout_lines[0].split(' ')[2] }}"
   when:                 opatch_vers_data.stdout_lines is defined
 
 - name:                 "Install latest version of OPatch (P6880880)"
-  unarchive:
+  ansible.builtin.unarchive:
     dest:               "{{ oracle_home }}"
     owner:              oracle
     group:              "{{ install_group }}"
@@ -236,8 +242,13 @@
   -                     opatch_version is defined
   -                     opatch_version is version(min_opatch_vers, operator='lt', strict=false)
 
-- name:                 "Check if patches from {{ patch_directory }} hav been applied"
-  command:
+# ------------------------------------------------------------------------------
+# Check fails with rc=1 if patches have not been applied. This is an expected
+# condition, so it is not a playbook failure. 
+# ------------------------------------------------------------------------------
+
+- name:                 "Check if patches from {{ patch_directory }} have been applied"
+  ansible.builtin.command:
     argv:
       -                 "{{ opatch_bin }}"
       -                 lspatches
@@ -245,7 +256,7 @@
       -                 "-oh"
       -                 "{{ oracle_home }}"
       -                 "{{ patch_directory }}"
-  failed_when:          false
+  failed_when:          patch_applied.rc > 1
   changed_when:         false
   register:             patch_applied
   become:               yes
@@ -254,17 +265,37 @@
   -                     opatch.stat.exists
 
 - name:                 "Status of patches in Oracle Home"
-  debug:
+  ansible.builtin.debug:
     var:                patch_applied.stdout_lines
   when:                 patch_applied.stdout_lines is defined
 
+# ------------------------------------------------------------------------------
+# Patch Oracle DB Software
+#
+# The following error messages are expected because the DB and listener have not
+# been created yet:
+#   ERROR:
+#   ORA-01034: ORACLE not available
+#   ORA-27101: shared memory realm does not exist
+#   Linux-x86_64 Error: 2: No such file or directory
+#   TNS-12541: TNS:no listener
+#   TNS-12560: TNS:protocol adapter error
+#   TNS-00511: No listener
+#   Linux Error: 111: Connection refused",
+#   Linux Error: 2: No such file or directory
+#   ORA-01078: failure in processing system parameters
+#   LRM-00109: could not open parameter file 
+# ------------------------------------------------------------------------------
+
 - name:                 "Patch Oracle DB Software"
-  command:
+  ansible.builtin.command:
     argv:
     -                   "{{ apply_patches }}"
     chdir:              "{{ oracle_home }}"
   failed_when:          false
   register:             opatch_apply
+  changed_when: >
+    (opatch_apply.stdout is search('Patch \d+ successfully applied'))
   when:
   -                     opatch.stat is defined
   -                     opatch.stat.exists
@@ -276,7 +307,27 @@
   become_user:          oracle
 
 - name:                 "Output from apply of patches into Oracle Home"
-  debug:
+  ansible.builtin.debug:
     var:                opatch_apply.stdout_lines
   when:                 opatch_apply.stdout_lines is defined
+
+- name:                 "Configure Oracle DB in Silent Mode"
+  ansible.builtin.command:
+    argv:
+    -                   "{{ config_rdbms }}"
+    chdir:              "{{ oracle_user_home }}"
+  register:             db_config_result
+  become:               yes
+  become_user:          oracle
+  failed_when:          "'[FATAL]' in db_config_result.stdout"
+  changed_when:         "'DB configured.' in db_config_result.stdout"
+  when:
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
+
+- name:                 "Output from Configure Oracle DB in Silent Mode"
+  ansible.builtin.debug:
+    var:                db_config_result.stdout_lines
+  when:                 db_config_result.stdout_lines is defined
+
 ...

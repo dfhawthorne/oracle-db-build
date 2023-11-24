@@ -1,0 +1,25 @@
+#!/usr/bin/bash
+# ------------------------------------------------------------------------------
+# Repairs Oracle RDBMS after installation and upgrade
+# Assumes repair SQL script in the same directory as this shell script.
+# ------------------------------------------------------------------------------
+
+pushd $(dirname $0)
+
+export ORAENV_ASK=NO
+export ORACLE_SID={{ SID }}
+export ORACLE_HOME={{ oracle_home }}
+. oraenv -s
+
+pushd {{ oracle_home }}/OPatch 
+./datapatch -verbose
+popd
+
+[[ -r repair_rdbms.sql ]] || {
+    printf "Cannot read repair_dbms.sql in %s\n" "${PWD}"
+    exit 1
+    }
+
+{{ oracle_home }}/bin/sqlplus / as sysdba @repair_rdbms.sql
+
+popd

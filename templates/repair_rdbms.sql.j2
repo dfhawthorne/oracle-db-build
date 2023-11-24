@@ -1,0 +1,192 @@
+REM ============================================================================
+REM Recompile invalid objects
+REM ============================================================================
+
+SET SQLPROMPT ""
+SET FEEDBACK OFF
+SET SERVEROUTPUT ON SIZE UNLIMITED FORMAT TRUNCATED
+SET LINESIZE 120
+SET TRIMSPOOL ON
+SET TERMOUT OFF
+
+WHENEVER SQLERROR EXIT FAILURE ROLLBACK
+WHENEVER OSERROR EXIT FAILURE ROLLBACK
+
+ALTER SESSION SET CONTAINER={{ PDBName }};
+
+EXEC dbms_output.enable;
+
+SPOOL repair.sql
+SET TERMOUT ON
+BEGIN
+  dbms_output.put_line('REM ============================================================================');
+  dbms_output.put_line('REM SQL Repair Script');
+  dbms_output.put_line('REM ============================================================================');
+  dbms_output.put_line(' ');
+END;
+/
+SPOOL OFF
+SET TERMOUT OFF
+
+VARIABLE num_fixes NUMBER
+EXEC :num_fixes := 0;
+
+REM ============================================================================
+REM PLS-00201: identifier DBMS_AQ_SUB.GET_SUB_CURSOR must be declared (Doc ID
+REM 2681183.1)
+REM ============================================================================
+
+DECLARE
+  l_num_inv_objs NUMBER := 0;
+BEGIN
+  SELECT
+      count(*) INTO l_num_inv_objs
+    FROM
+      dba_objects
+    WHERE
+        owner = 'SYS'
+      AND
+        object_name IN ('AQ$_GET_SUBSCRIBERS')
+      AND
+        status = 'INVALID';
+  IF l_num_inv_objs > 0 THEN
+    BEGIN
+      EXECUTE IMMEDIATE 'ALTER FUNCTION AQ$_GET_SUBSCRIBERS COMPILE';
+    EXCEPTION
+      WHEN OTHERS THEN
+        dbms_output.put_line('Failed: ALTER FUNCTION AQ$_GET_SUBSCRIBERS COMPILE');
+        dbms_output.put_line(SQLERRM);
+    END;
+    :num_fixes := :num_fixes + 1;
+  ELSE
+    dbms_output.put_line('SYS.AQ$_GET_SUBSCRIBERS was valid - no need for recompilation');
+  END IF;
+END;
+/
+
+SPOOL repair.sql APPEND
+SET TERMOUT ON
+
+DECLARE
+  l_num_inv_objs NUMBER := 0;
+BEGIN
+  SELECT 
+      count(*) INTO l_num_inv_objs
+    FROM
+      dba_objects
+    WHERE
+        owner = 'SYS'
+      AND
+        object_name IN ('AQ$_GET_SUBSCRIBERS')
+      AND
+        status = 'INVALID';
+  IF l_num_inv_objs > 0 THEN
+    dbms_output.put_line('REM ============================================================================');
+    dbms_output.put_line('REM PLS-00201: identifier ''DBMS_AQ_SUB.GET_SUB_CURSOR'' must be declared (Doc ID');
+    dbms_output.put_line('REM 2681183.1');
+    dbms_output.put_line('REM ============================================================================');
+    dbms_output.put_line('@?/rdbms/admin/depsaq.sql');
+    :num_fixes := :num_fixes + 1;
+  ELSE
+    dbms_output.put_line('REM No fix up required for AQ$_GET_SUBSCRIBER');
+  END IF;
+END;
+/
+
+SPOOL OFF
+SET TERMOUT OFF
+  
+REM ============================================================================
+REM KUPW$WORKER or KUPU$UTILITIES_INT Invalid after Upgrade (Doc ID 2691905.1)
+REM ============================================================================
+
+DECLARE
+  l_num_inv_objs NUMBER := 0;
+BEGIN
+  SELECT
+      count(*) INTO l_num_inv_objs
+    FROM
+      dba_objects
+    WHERE
+        owner = 'SYS'
+      AND
+        object_name IN ('KUPW$WORKER', 'KUPU$UTILITIES_INT')
+      AND
+        status = 'INVALID';
+  IF l_num_inv_objs > 0 THEN
+    BEGIN
+      EXECUTE IMMEDIATE 'ALTER PACKAGE KUPW$WORKER COMPILE BODY';
+    EXCEPTION
+      WHEN OTHERS THEN
+        dbms_output.put_line('Failed: ALTER PACKAGE KUPW$WORKER COMPILE BODY');
+        dbms_output.put_line(SQLERRM);
+    END;
+    :num_fixes := :num_fixes + 1;
+  ELSE
+    dbms_output.put_line('PACKAGE KUPW$WORKER was valid - no need to recompile');
+  END IF;
+END;
+/
+
+SPOOL repair.sql APPEND
+SET TERMOUT ON
+
+DECLARE
+  l_num_inv_objs NUMBER := 0;
+BEGIN
+  SELECT
+      count(*) INTO l_num_inv_objs
+    FROM
+      dba_objects
+    WHERE
+        owner = 'SYS'
+      AND
+        object_name IN ('KUPW$WORKER', 'KUPU$UTILITIES_INT')
+      AND
+        status = 'INVALID';
+  IF l_num_inv_objs > 0 THEN
+    dbms_output.put_line('REM ============================================================================');
+    dbms_output.put_line('REM KUPW$WORKER or KUPU$UTILITIES_INT Invalid after Upgrade (Doc ID 2691905.1)');
+    dbms_output.put_line('REM ============================================================================');
+    dbms_output.put_line('@?/rdbms/admin/prvthpui.plb');
+    dbms_output.put_line('@?/rdbms/admin/prvtbpui.plb');
+    dbms_output.put_line('alter package KUPW$WORKER compile body;');
+    dbms_output.put_line('alter package KUPU$UTILITIES_INT compile body;');
+    :num_fixes := :num_fixes + 1;
+  ELSE
+    dbms_output.put_line('REM No fix up requirted for KUPW$WORKER or KUPU$UTILITIES_INT');
+  END IF;
+END;
+/
+
+SPOOL OFF
+SET TERMOUT OFF
+
+SPOOL repair.sql APPEND
+SET TERMOUT ON
+BEGIN
+  IF :num_fixes > 0 THEN
+    dbms_output.put_line('REM ============================================================================');
+    dbms_output.put_line('REM Recompile invalid objects');
+    dbms_output.put_line('REM ============================================================================');
+    dbms_output.put_line('@?/rdbms/admin/utlrp');
+    dbms_output.put_line('@?/rdbms/admin/utlrp');
+  ELSE
+    dbms_output.put_line('REM No invalid objects required to be recompiled');
+  END IF;
+END;
+/
+
+SPOOL OFF
+SET TERMOUT OFF
+
+EXEC dbms_output.put_line('REM Number of SQL fixes applied is ' || to_char(:num_fixes));
+
+REM ============================================================================
+REM Run the repair script
+REM ============================================================================
+
+SPOOL repair.log
+@repair
+SPOOL OFF
+EXIT

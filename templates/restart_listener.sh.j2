@@ -1,0 +1,13 @@
+#!/bin/bash
+# ------------------------------------------------------------------------------
+# Restarts Oracle Database Listener
+# ------------------------------------------------------------------------------
+
+export ORACLE_BASE={{ oracle_base }}
+export ORACLE_HOME={{ oracle_home }}
+export PATH={{ oracle_home }}/bin:${PATH}
+
+lsnrctl stop
+lsnrctl start
+exit 0
+

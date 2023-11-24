@@ -6,8 +6,36 @@
 
 export CV_ASSUME_DISTID=OL7
 
-{{ oracle_home }}/runInstaller          \
-  -executeConfigTools                   \
-  -responseFile \"{{ response_file }}\" \
-  -silent                               \
-  -waitforcompletion
+grab_nest_line=1
+log_dir=""
+
+while read line
+do
+  printf "%s" "${line}"
+  if [[ ${grab_next_line} ]]
+  then
+    log_dir="${line}"
+    grab_nest_line=1
+  fi
+  [[ "${line}" == "You can find the logs of this session at:" ]] && \
+    grab_next_line=0
+done < <(                                 \
+    {{ oracle_home }}/runInstaller          \
+      -executeConfigTools                   \
+      -responseFile \"{{ response_file }}\" \
+      -silent                               \
+      -waitforcompletion
+    )
+
+if [[ -n "${log_dir}" && -d "${log_dir}" ]]
+then
+  grep -qr "isSuccessfullInstallation: true" "${log_dir}"
+  if [[ $? -eq 0 ]]
+  then
+    printf "DB configured."
+  else
+    printf "DB is already configured."
+  fi
+else
+  printf "Unable to determined status of DB configuration."
+fi

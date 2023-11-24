@@ -24,6 +24,17 @@
     name:               "{{ inventory_hostname }}"
   become:               yes
   become_user:          root
+  
+- name:                 "Propagate host name to /etc/hosts"
+  ansible.builtin.lineinfile:
+    path:               /etc/hosts
+    line:               "127.0.0.1 {{ inventory_hostname_short }} {{ inventory_hostname }}"
+    state:              present
+    owner:              root
+    group:              root
+    mode:               '0644'
+  become:               yes
+  become_user:          root
 
 # ----------------------------------------------------------------------------
 # Load passwords from passwords/oracle.yml which has the following variables:
@@ -37,8 +48,9 @@
 
 - name:                 "Load passwords"
   ansible.builtin.include_vars:
-    file:               "passwords/oracle.yml"
+    file:               "../orchestration/passwords/oracle.yml"
   no_log:               true
+  when:                 pw_all is not defined
 
 # -----------------------------------------------------------------------------
 # Load global variables for installation of Oracle RDBMS
@@ -66,9 +78,18 @@
       -                 nscd
       -                 autofs
       -                 nfs-utils
+      -                 python3-pip
     state:              present
   become:               yes
   become_user:          root
+
+- name:                 "Install required Python packages"
+  ansible.builtin.pip:
+    name:
+      -                 "cx_Oracle"
+    state:              present
+  become:               yes
+  become_user:          root 
 
 - name:                 "Create mount point"
   ansible.builtin.file:
@@ -145,8 +166,8 @@
     state:              enabled
     zone:               public
   with_items:
-    -                   "1521/tcp"
-    -                   "1521/udp"
+    -                   "{{ oracle_listener_port }}/tcp"
+    -                   "{{ oracle_listener_port }}/udp"
   become:               yes
   become_user:          root
   notify:               "Reload FireWall Rules"
@@ -163,7 +184,7 @@
     -                   ansible_distribution_major_version == '7'
 
 # ------------------------------------------------------------------------------
-# Use the Ansible group name to determine what script to follow.
+# Use the database version specific script.
 # Guard against missing AutoFS service because installation files are on remote
 # servers.
 # ------------------------------------------------------------------------------
@@ -174,4 +195,136 @@
   when:
     -                   autofs_master.stat is defined
     -                   autofs_master.stat.exists
+
+# ------------------------------------------------------------------------------
+# Restart the database instance and open all pluggable databases, then save that
+# state for future restarts.
+# ------------------------------------------------------------------------------
+
+- name:                 "Create files for database restart and repair"
+  ansible.builtin.template:
+    src:                "{{ item.dest | basename  }}.j2"
+    dest:               "{{ item.dest }}"
+    mode:               "{{ item.mode }}"
+  become:               yes
+  become_user:          oracle
+  with_items:
+  - { dest: "{{ repair_rdbms }}", mode: "0700" }
+  - { dest: "{{ repair_script }}", mode: "0600" }
+  - { dest: "{{ restart_listener }}", mode: "0700" }
+  - { dest: "{{ start_db_inst }}", mode: "0700" }
+  
+- name:                 "Restart database instance and save PDB state"
+  ansible.builtin.command:
+    cmd:                "{{ start_db_inst }}"
+    chdir:              "{{ oracle_user_home }}"
+  register:             restart_db
+  changed_when: >
+    ('Listener started successfully' in restart_db.stdout) or
+    (restart_db.stdout is search('CDB (instance|Database) (start|mount|open)ed')) or
+    ('Logins are now allowed.' in restart_db.stdout) or
+    (restart_db.stdout is search('PDB (.*) opened')) or
+    (restart_db.stdout is search('PDB (.*) state saved'))
+  become:               yes
+  become_user:          oracle
+  
+- name:                 "Show output from database restart"
+  ansible.builtin.debug:
+    var:
+      restart_db.stdout_lines
+  when:
+    -                   restart_db.stdout_lines is defined
+
+# ------------------------------------------------------------------------------
+# Do database repair, if required.
+# ------------------------------------------------------------------------------
+
+- name:                 "Repair Oracle DB"
+  ansible.builtin.command:
+    argv:
+    -                   "{{ repair_rdbms }}"
+    chdir:              "{{ oracle_user_home }}"
+  register:             db_repair_result
+  changed_when: >
+    (db_repair_result.stdout is search('Patch installation complete.  Total patches installed: \d+')) or 
+    (db_repair_result.stdout is search('Number of SQL fixes applied is \d+'))
+  become:               yes
+  become_user:          oracle
+  when:
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
+
+- name:                 "Output from Repair Oracle DB"
+  ansible.builtin.debug:
+    var:                db_repair_result.stdout_lines
+  when:                 db_repair_result.stdout_lines is defined
+
+- name:                 "Add Oracle Listener end-point"
+  ansible.builtin.lineinfile:
+    path:               "{{ oracle_home }}/network/admin/listener.ora"
+    line:               "      (ADDRESS = (PROTOCOL = TCP)(HOST = {{ inventory_hostname }})(PORT = {{ oracle_listener_port }}))"
+    regex:              "\\(\\s*PROTOCOL\\s*=\\s*TCP\\s*\\)"
+    state:              present
+  become:               yes
+  become_user:          oracle
+  register:             add_oracle_listener_ep
+  when:
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
+
+- name:                 "Restart Oracle Listener"
+  ansible.builtin.command:
+    argv:
+    -                   "{{ restart_listener }}"
+    chdir:              "{{ oracle_user_home }}"
+  register:             restart_oracle_listener
+  become:               yes
+  become_user:          oracle
+  when:
+  -                     oracle_home_path.stat is defined
+  -                     oracle_home_path.stat.exists
+  -                     add_oracle_listener_ep.changed
+
+- name:                 "Output from Restart Oracle Listener"
+  ansible.builtin.debug:
+    var:                restart_oracle_listener.stdout_lines
+  when:                 restart_oracle_listener.stdout_lines is defined
+
+# -----------------------------------------------------------------------------
+# Update .bash_profile for Oracle DB installation
+# -----------------------------------------------------------------------------
+
+- name:                 "Update .bash_profile for Oracle DB installation"
+  ansible.builtin.blockinfile:
+    create:             yes
+    owner:              oracle
+    group:              "{{ install_group }}"
+    mode:               "0700"
+    path:               "{{ oracle_user_home }}/.bash_profile"
+    state:              present
+    marker:             "# {mark} ANSIBLE MANAGED BLOCK FOR DB INSTALLATION"
+    block: |
+      export ORACLE_BASE="{{ oracle_base }}"
+      export ORACLE_HOME="{{ oracle_db_home }}"
+      export ORACLE_SID="{{ SID }}"
+      case ":${PATH}:" in
+          *":${ORACLE_HOME}/bin:"*)
+              ;;
+          *)  export PATH="${ORACLE_HOME}/bin:${PATH}"
+              ;;
+      esac
+      if [[ -n "${LD_LIBRARY_PATH}" ]]
+      then
+          case ":${LD_LIBRARY_PATH}:" in
+              *":${ORACLE_HOME}/lib:"*)
+                  ;;
+              *)  export LD_LIBRARY_PATH="${ORACLE_HOME}/lib:${LD_LIBRARY_PATH}"
+                  ;;
+          esac
+      else
+          export LD_LIBRARY_PATH="${ORACLE_HOME}/lib"
+      fi
+  become:               yes
+  become_user:          oracle
+
 ...

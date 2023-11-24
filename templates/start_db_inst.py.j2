@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/libexec/platform-python
 # ------------------------------------------------------------------------------
 # Configures the database on the System Under Test (SUT) for use by HammerDB
 # ------------------------------------------------------------------------------
@@ -97,7 +97,14 @@ if status == "MOUNTED":
     status = "OPEN"
     print("CDB Database opened")
 
-print(f'Status of CDB Instance is {status}')
+cursor.execute("SELECT status, logins, database_status FROM v$instance")
+(status, logins, database_status) = cursor.fetchone()
+
+print(f'Status of CDB Instance is {status}, status of database is {database_status}, and logins are {logins}')
+
+if logins == 'RESTRICTED':
+    cursor.execute('ALTER SYSTEM DISABLE RESTRICTED SESSION')
+    print('Logins are now allowed.')
 
 # ------------------------------------------------------------------------------
 # Open the pluggable database, if required
@@ -106,26 +113,36 @@ print(f'Status of CDB Instance is {status}')
 cursor.execute("select open_mode from v$pdbs where name='{{ PDBName }}'")
 (pdb_open_mode, ) = cursor.fetchone()
 if pdb_open_mode == "MOUNTED":
-    cursor.execute("ALTER PLUGGABLE DATABASE {{ PDBName }} OPEN")
-    cursor.execute("ALTER PLUGGABLE DATABASE {{ PDBName }} SAVE STATE")
-    print("PDB ({{ PDBName }}) opened")
-
-cursor.execute("select open_mode from v$pdbs where name='{{ PDBName }}'")
-(pdb_open_mode, ) = cursor.fetchone()
-
-print(f'Status of PDB ({{ PDBName }}) is {pdb_open_mode}')
+    try:
+        cursor.execute("ALTER PLUGGABLE DATABASE {{ PDBName }} OPEN")
+        print("PDB ({{ PDBName }}) opened")
+    except cx_Oracle.DatabaseError as exc:
+        print(f"Open of PDB ({{ PDBName }}) failed:");
+        error, = exc.args
+        print("Oracle-Error-Code:", error.code)
+        print("Oracle-Error-Message:", error.message)
+        exit(1)
 
 # ------------------------------------------------------------------------------
 # Save the state of the pluggable database, if required
 # ------------------------------------------------------------------------------
 
+cursor.execute("SELECT open_mode FROM v$pdbs WHERE name='{{ PDBName }}'")
+(pdb_open_mode, ) = cursor.fetchone()
+
+print(f'Status of PDB ({{ PDBName }}) is {pdb_open_mode}')
+
 cursor.execute("SELECT state FROM cdb_pdb_saved_states WHERE con_name='{{ PDBName }}'")
-(pdb_saved_state, ) = cursor.fetchone()
+row = cursor.fetchone()
+if row is None:
+    pdb_saved_state = None
+else:
+    pdb_saved_state = row[0]
 if pdb_saved_state is None or pdb_saved_state != "OPEN":
     cursor.execute("ALTER PLUGGABLE DATABASE {{ PDBName }} SAVE STATE")
     print("PDB ({{ PDBName }}) state saved")
 else:
-    print(f"Status of PDB ({{ PDBName }}) is {pdb_saved_state}")
+    print(f"Saved status of PDB ({{ PDBName }}) is {pdb_saved_state}")
 
 cursor.close()
 conn.close()
