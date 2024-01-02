@@ -6,5 +6,5 @@
 pre_install_rpm:        "oracle-database-preinstall-19c"
 oracle_home:            "{{ oracle_base }}/product/19.3.0.2/database"
 sw_archive:             "{{ nfs_software_dir }}/database/LINUX.X64_193000_db_home.zip"
-DB_PSU:                 "19.9"
+DB_PSU:                 "19.21"
 ...

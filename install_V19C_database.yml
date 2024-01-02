@@ -30,7 +30,7 @@
 - name:                 "Set Combo Patch Global Variables"
   ansible.builtin.set_fact:
     combo_patch_archive:
-                        "{{ nfs_software_dir }}/Patches/p{{ combo_patch_id }}_190000_Linux-x86-64.zip"
+                        "{{ nfs_software_dir }}/Patches/p{{ combo_patch_id }}_190000_Linux-x86-64/p{{ combo_patch_id }}_190000_Linux-x86-64.zip"
     combo_patch_directory:
                         "{{ oracle_home }}/patch/{{ combo_patch_id }}"
   when:                 combo_patch_id is defined
@@ -45,9 +45,9 @@
 - name:                 "Set RDBMS and OJVM Patch Global Variables"
   ansible.builtin.set_fact:
     ojvm_patch_archive:
-                        "{{ nfs_software_dir }}/Patches/p{{ ojvm_patch_id }}_190000_Linux-x86-64.zip"
+                        "{{ nfs_software_dir }}/Patches/p{{ ojvm_patch_id }}_190000_Linux-x86-64/p{{ ojvm_patch_id }}_190000_Linux-x86-64.zip"
     rdbms_patch_archive:
-                        "{{ nfs_software_dir }}/Patches/p{{ rdbms_patch_id }}_190000_Linux-x86-64.zip"
+                        "{{ nfs_software_dir }}/Patches/p{{ rdbms_patch_id }}_190000_Linux-x86-64/p{{ rdbms_patch_id }}_190000_Linux-x86-64.zip"
     ojvm_patch_directory:
                         "{{ oracle_home }}/patch/{{ ojvm_patch_id }}"
     rdbms_patch_directory:
