@@ -14,9 +14,45 @@
       -                 ansible_distribution == "OracleLinux"
       -                 ansible_distribution_major_version >= '7'
 
+# ------------------------------------------------------------------------------
+# Global Variables for Script
+# ------------------------------------------------------------------------------
+
+- name:                 "Include Variables for Selected PSU"
+  ansible.builtin.include_vars:
+    file:               "PSU{{ DB_PSU }}.yml"
+
 - name:                 "Set global variables"
   ansible.builtin.set_fact:
     response_file:      "{{ oracle_user_home }}/db_install.rsp"
+    opatch_source:      "{{ nfs_software_dir }}/OPatch/{{ min_opatch_vers }}/p6880880_190000_Linux-x86-64.zip"
+
+- name:                 "Set Combo Patch Global Variables"
+  ansible.builtin.set_fact:
+    combo_patch_archive:
+                        "{{ nfs_software_dir }}/Patches/p{{ combo_patch_id }}_190000_Linux-x86-64.zip"
+    combo_patch_directory:
+                        "{{ oracle_home }}/patch/{{ combo_patch_id }}"
+  when:                 combo_patch_id is defined
+
+- name:                 "Must define RDBMS_PATCH_ID and OJVM_PATCH_ID"
+  ansible.builtin.assert:
+    msg:                "Must define RDBMS_PATCH_ID and OJVM_PATCH_ID"
+    that:  
+      -                 rdbms_patch_id is defined
+      -                 ojvm_patch_id is defined
+
+- name:                 "Set RDBMS and OJVM Patch Global Variables"
+  ansible.builtin.set_fact:
+    ojvm_patch_archive:
+                        "{{ nfs_software_dir }}/Patches/p{{ ojvm_patch_id }}_190000_Linux-x86-64.zip"
+    rdbms_patch_archive:
+                        "{{ nfs_software_dir }}/Patches/p{{ rdbms_patch_id }}_190000_Linux-x86-64.zip"
+    ojvm_patch_directory:
+                        "{{ oracle_home }}/patch/{{ ojvm_patch_id }}"
+    rdbms_patch_directory:
+                        "{{ oracle_home }}/patch/{{ rdbms_patch_id }}"
+  when:                 combo_patch_id is not defined
 
 # ----------------------------------------------------------------------------
 # The Oracle preinstallation RPM should only be installed once, even if
@@ -30,6 +66,10 @@
     state:              present
   become:               yes
   become_user:          root
+
+# ------------------------------------------------------------------------------
+# Create directories and scripts for database installation and patching
+# ------------------------------------------------------------------------------
 
 - name:                 "Create files for silent installation"
   ansible.builtin.template:
@@ -54,11 +94,6 @@
   become:               yes
   become_user:          root
 
-- name:                 "Checks the existence of {{ oracle_home }}"
-  ansible.builtin.stat:
-    path:               "{{ oracle_home }}"
-  register:             oracle_home_path
-
 - name:                 "Extract the Oracle Software Installer"
   ansible.builtin.unarchive:
     creates:            "{{ oracle_home }}/runInstaller"
@@ -69,9 +104,6 @@
     src:                "{{ sw_archive }}"
   become:               yes
   become_user:          oracle
-  when:
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
 
 - name:                 "Create directory for Patches"
   ansible.builtin.file:
@@ -82,30 +114,33 @@
     mode:               0775
   become:               yes
   become_user:          oracle
-  when:
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
 
-- name:                 "Extract the patches"
+- name:                 "Extract the COMBO patches"
   ansible.builtin.unarchive:
-    creates:            "{{ patch_directory }}"
+    creates:            "{{ combo_patch_directory }}"
     dest:               "{{ oracle_home }}/patch"
     group:              "{{ install_group }}"
     owner:              oracle
     remote_src:         yes
-    src:                "{{ patch_archive }}"
+    src:                "{{ combo_patch_archive }}"
+  when:                 combo_patch_id is defined
   become:               yes
   become_user:          oracle
-  when:
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
 
-- name:                 "Check existence of OPatch"
-  ansible.builtin.stat:
-    path:               "{{ opatch_bin }}"
-  register:             opatch
+- name:                 "Extract the OJVM and RDBMS patches"
+  ansible.builtin.unarchive:
+    creates:            "{{ item.dir }}"
+    dest:               "{{ oracle_home }}/patch"
+    group:              "{{ install_group }}"
+    owner:              oracle
+    remote_src:         yes
+    src:                "{{ item.src }}"
+  when:                 combo_patch_id is not defined
   become:               yes
   become_user:          oracle
+  loop:
+  - {dir: "{{ ojvm_patch_directory }}", src: "{{ ojvm_patch_archive }}"}
+  - {dir: "{{ rdbms_patch_directory }}", src: "{{ rdbms_patch_archive }}"}
 
 - name:                 "Check if db s/w has been installed"
   ansible.builtin.command:
@@ -119,9 +154,6 @@
   register:             db_sw_installed
   become:               yes
   become_user:          oracle
-  when:
-  -                     opatch.stat is defined
-  -                     opatch.stat.exists
 
 - name:                 "Display inventory listing for OH={{ oracle_home }}"
   ansible.builtin.debug:
@@ -138,12 +170,8 @@
   become_user:          oracle
   failed_when:          "'[FATAL]' in db_install_result.stderr"
   when:
-  -                     opatch.stat is defined
-  -                     opatch.stat.exists
   -                     db_sw_installed.stdout is defined
   -                     db_sw_installed.stdout is not search("Oracle Database 19c")
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
 
 - name:                 "Output from Install Oracle DB Software in Silent Mode"
   ansible.builtin.debug:
@@ -218,11 +246,6 @@
   changed_when:         false
   become:               yes
   become_user:          oracle
-  when:
-  -                     opatch.stat is defined
-  -                     opatch.stat.exists
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
 
 - name:                 "Extract version of OPatch from command output"
   ansible.builtin.set_fact:
@@ -247,27 +270,75 @@
 # condition, so it is not a playbook failure. 
 # ------------------------------------------------------------------------------
 
-- name:                 "Check if patches from {{ patch_directory }} have been applied"
-  ansible.builtin.command:
-    argv:
-      -                 "{{ opatch_bin }}"
-      -                 lspatches
-      -                 "-verify"
-      -                 "-oh"
-      -                 "{{ oracle_home }}"
-      -                 "{{ patch_directory }}"
-  failed_when:          patch_applied.rc > 1
-  changed_when:         false
-  register:             patch_applied
-  become:               yes
-  become_user:          oracle
-  when:
-  -                     opatch.stat.exists
+- name:                 "Check if combo patch has been applied"
+  block:
 
-- name:                 "Status of patches in Oracle Home"
-  ansible.builtin.debug:
-    var:                patch_applied.stdout_lines
-  when:                 patch_applied.stdout_lines is defined
+    - name:             "Check if combo patch has been applied"
+      ansible.builtin.command:
+        argv:
+          -             "{{ opatch_bin }}"
+          -             lspatches
+          -             "-verify"
+          -             "-oh"
+          -             "{{ oracle_home }}"
+          -             "{{ combo_patch_directory }}"
+      failed_when:      combo_patch_applied.rc > 1
+      changed_when:     false
+      register:         combo_patch_applied
+      become:           yes
+      become_user:      oracle
+
+    - name:             "Status of combo patch in Oracle Home"
+      ansible.builtin.debug:
+        var:            combo_patch_applied.stdout_lines
+      when:             combo_patch_applied.stdout_lines is defined
+
+  when:                 combo_patch_id is defined
+
+- name:                 "Check if rdbms and ojvm patches have been applied"
+  block:
+
+    - name:               "Check if rdbms patch has been applied"
+      ansible.builtin.command:
+        argv:
+          -             "{{ opatch_bin }}"
+          -             lspatches
+          -             "-verify"
+          -             "-oh"
+          -             "{{ oracle_home }}"
+          -             "{{ rdbms_patch_directory }}"
+      failed_when:      rdbms_patch_applied.rc > 1
+      changed_when:     false
+      register:         rdbms_patch_applied
+      become:           yes
+      become_user:      oracle
+
+    - name:             "Status of rdbms patch in Oracle Home"
+      ansible.builtin.debug:
+        var:            rdbms_patch_applied.stdout_lines
+      when:             rdbms_patch_applied.stdout_lines is defined
+
+    - name:             "Check if ojvm patch has been applied"
+      ansible.builtin.command:
+        argv:
+          -             "{{ opatch_bin }}"
+          -             lspatches
+          -             "-verify"
+          -             "-oh"
+          -             "{{ oracle_home }}"
+          -             "{{ ojvm_patch_directory }}"
+      failed_when:      ojvm_patch_applied.rc > 1
+      changed_when:     false
+      register:         ojvm_patch_applied
+      become:           yes
+      become_user:      oracle
+
+    - name:             "Status of ojvm patch in Oracle Home"
+      ansible.builtin.debug:
+        var:            ojvm_patch_applied.stdout_lines
+      when:             ojvm_patch_applied.stdout_lines is defined
+
+  when:                 combo_patch_id is not defined
 
 # ------------------------------------------------------------------------------
 # Patch Oracle DB Software
@@ -296,13 +367,17 @@
   register:             opatch_apply
   changed_when: >
     (opatch_apply.stdout is search('Patch \d+ successfully applied'))
-  when:
-  -                     opatch.stat is defined
-  -                     opatch.stat.exists
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
-  -                     patch_applied.stdout is defined
-  -                     patch_applied.stdout is search(' NOT registered in Oracle Home')
+  when: >
+                        (
+                          combo_patch_applied.stdout is defined and
+                          combo_patch_applied.stdout is search(' NOT registered in Oracle Home')
+                        ) or (
+                          ojvm_patch_applied.stdout is defined and
+                          ojvm_patch_applied.stdout is search(' NOT registered in Oracle Home')
+                        ) or (
+                          rdbms_patch_applied.stdout is defined and 
+                          rdbms_patch_applied.stdout is search(' NOT registered in Oracle Home')
+                        )
   become:               yes
   become_user:          oracle
 
@@ -310,6 +385,10 @@
   ansible.builtin.debug:
     var:                opatch_apply.stdout_lines
   when:                 opatch_apply.stdout_lines is defined
+
+# ------------------------------------------------------------------------------
+# Configure DB
+# ------------------------------------------------------------------------------
 
 - name:                 "Configure Oracle DB in Silent Mode"
   ansible.builtin.command:
@@ -321,9 +400,6 @@
   become_user:          oracle
   failed_when:          "'[FATAL]' in db_config_result.stdout"
   changed_when:         "'DB configured.' in db_config_result.stdout"
-  when:
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
 
 - name:                 "Output from Configure Oracle DB in Silent Mode"
   ansible.builtin.debug:

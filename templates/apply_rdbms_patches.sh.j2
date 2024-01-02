@@ -2,7 +2,8 @@
 # ------------------------------------------------------------------------------
 # Patches Oracle RDBMS 19.3 Under OL 8
 # Implements recommendation from MOS Doc 2668780.1
-# Ref: Oracle Recommended Patches -- "Oracle JavaVM Component Database PSU and Update" (OJVM PSU and OJVM Update) Patches (Doc ID 1929745.1)
+# Ref: Oracle Recommended Patches -- "Oracle JavaVM Component Database PSU and
+#      Update" (OJVM PSU and OJVM Update) Patches (Doc ID 1929745.1)
 # ------------------------------------------------------------------------------
 
 export ORACLE_SID={{ SID }}
@@ -21,23 +22,36 @@ lsnrctl stop
 
 # Apply DB RU
 
-pushd {{ patch_directory }}/31771877
+{% if combo_patch_id is defined -%}
+pushd {{ combo_patch_directory }}/{{ rdbms_patch_id }}
+{% else -%}
+pushd {{ rdbms_patch_directory }}
+{% endif %}
+
 
 opatch prereq CheckConflictAgainstOHWithDetail -ph . \
     || exit 1
 
 opatch apply -silent \
     || exit 1
+    
+popd 
 
 # Apply JavaVM RU
 
-pushd {{ patch_directory }}/31668882
+{% if combo_patch_id is defined -%}
+pushd {{ combo_patch_directory }}/{{ ojvm_patch_id }}
+{% else -%}
+pushd {{ ojvm_patch_directory }}
+{% endif %}
 
 opatch prereq CheckConflictAgainstOHWithDetail -ph . \
     || exit 1
 
 opatch apply -silent \
     || exit 1
+
+popd
 
 # Post-apply steps
 
@@ -48,8 +62,12 @@ alter pluggable database all open upgrade;
 quit
 DONE
 
+pushd {{ oracle_home }}/OPatch
+
 datapatch -verbose \
     || exit 1
+
+popd
 
 sqlplus /nolog <<DONE	
 Connect / as sysdba

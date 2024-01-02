@@ -7,7 +7,7 @@ Prof. Fred Brooks recommends that one keep a journal of design decisions in orde
 ## Table of Contents
 
 * [2021-01-21](2021_01_21.md) Creation of a separate respository
-* [2021-01-23](2021_01_23.md) # 2021_01_23: Installation of 18C XE Software
+* [2021-01-23](2021_01_23.md) Installation of 18C XE Software
 * [2021-02-02](2021_02_02.md) Failed 18C XE Installation
 * [2021-02-03](2021_02_03.md) Successful 18C XE Installation
 * [2021-02-04](2021_02_04.md) Cleanup of 18C XE Installation
@@ -21,3 +21,4 @@ Prof. Fred Brooks recommends that one keep a journal of design decisions in orde
 * [2023-12-07](2023_12_07.md) Configuration of Oracle DB Updated
 * [2023-12-08](2023_12_08.md) Installation of RDBMS Updated
 * [2023-12-09](2023_12_09.md) Installation of Oracle 19C Updated
+* [2024-01-01](2024_01_01.md) Refactor DB Patching to Use PSU
