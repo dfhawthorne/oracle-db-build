@@ -68,6 +68,19 @@
   become_user:          root
 
 # ------------------------------------------------------------------------------
+# Apply fix as recommended by "OPatch apply for OJVM RU fails with "make: perl:
+# Command not found make: *** [ins_rdbms.mk:573: javavm_refresh] Error 127"
+# (Doc ID 2978451.1)"
+# ------------------------------------------------------------------------------
+
+- name:                 "Install Perl"
+  ansible.builtin.yum:
+    name:               perl
+    state:              present
+  become:               yes
+  become_user:          root
+
+# ------------------------------------------------------------------------------
 # Create directories and scripts for database installation and patching
 # ------------------------------------------------------------------------------
 
