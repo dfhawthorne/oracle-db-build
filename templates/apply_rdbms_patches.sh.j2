@@ -11,49 +11,97 @@ export ORACLE_HOME={{ oracle_home }}
 
 export PATH={{ oracle_home }}/bin:{{ oracle_home }}/OPatch:${PATH}
 
+# ------------------------------------------------------------------------------
+# Determine if patches have already been applied.
+# ------------------------------------------------------------------------------
+
+rdbms_patch_applied=1
+ojvm_patch_applied=1
+
+while read keyword patch_id rest_of_line
+do
+    [[ -z "${keyword}" ]] && continue
+    [[ "${keyword}" != "Patch" ]] && continue
+    case "${rest_of_line}" in
+        ": applied "*) ;;
+        *)             continue;
+    esac
+    case "${patch_id}" in
+        {{ rdbms_patch_id }}) rdbms_patch_applied=0;;
+        {{ ojvm_patch_id }})  ojvm_patch_applied=0;;
+        *) ;;
+    esac
+done < <(opatch lsinventory)
+
+if [[ "${rdbms_patch_applied}" && "${ojvm_patch_applied}" ]]
+then
+    printf "Both patches have been applied. Exiting.\n"
+    exit 0
+fi
+
 # Stop all Oracle processes
 
-sqlplus -S -L / as sysdba <<DONE
-shutdown immediate
-exit
+num_pmon_processes=$(ps -ef|grep -cE '[p]mon')
+if [[ "${num_pmon_processes}" -gt 0 ]]
+then
+    sqlplus -S -L / as sysdba <<DONE
+    shutdown immediate
+    exit
 DONE
+fi
 
-lsnrctl stop
+num_lsnr_processes=$(ps -ef|grep -cE '[t]ns')
+if [[ "${num_lsnr_processes}" -gt 0 ]]
+then
+    lsnrctl stop
+fi
 
 # Apply DB RU
 
-{% if combo_patch_id is defined -%}
-pushd {{ combo_patch_directory }}/{{ rdbms_patch_id }}
-{% else -%}
-pushd {{ rdbms_patch_directory }}
-{% endif %}
-
-
-opatch prereq CheckConflictAgainstOHWithDetail -ph . \
-    || exit 1
-
-opatch apply -silent \
-    || exit 1
+if [[ ! "${rdbms_patch_applied}" ]]
+then
+    {% if combo_patch_id is defined -%}
+    pushd {{ combo_patch_directory }}/{{ rdbms_patch_id }}
+    {% else -%}
+    pushd {{ rdbms_patch_directory }}
+    {% endif %}
     
-popd 
+    
+    opatch prereq CheckConflictAgainstOHWithDetail -ph . \
+        || exit 1
+    
+    opatch apply -silent \
+        || exit 1
+        
+    popd 
+fi
 
 # Apply JavaVM RU
 
-{% if combo_patch_id is defined -%}
-pushd {{ combo_patch_directory }}/{{ ojvm_patch_id }}
-{% else -%}
-pushd {{ ojvm_patch_directory }}
-{% endif %}
-
-opatch prereq CheckConflictAgainstOHWithDetail -ph . \
-    || exit 1
-
-opatch apply -silent \
-    || exit 1
-
-popd
+if [[ ! "${rdbms_patch_applied}" ]]
+then
+    {% if combo_patch_id is defined -%}
+    pushd {{ combo_patch_directory }}/{{ ojvm_patch_id }}
+    {% else -%}
+    pushd {{ ojvm_patch_directory }}
+    {% endif %}
+    
+    opatch prereq CheckConflictAgainstOHWithDetail -ph . \
+        || exit 1
+    
+    opatch apply -silent \
+        || exit 1
+    
+    popd
+fi
 
 # Post-apply steps
+
+if [[ ! -f "${ORACLE_HOME}/dbs/spfile${ORACLE_SID}.ora" ]]
+then
+    printf "No SPFILE found. No need to start DB and listener.\n"
+    exit 0
+fi
 
 sqlplus /nolog <<DONE
 Connect / as sysdba
@@ -85,3 +133,4 @@ Connect / as sysdba
 quit
 DONE
 
+lsnrctl start

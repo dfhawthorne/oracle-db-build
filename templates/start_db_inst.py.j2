@@ -6,6 +6,7 @@
 import os
 import cx_Oracle
 import subprocess
+import time
 
 os.environ['ORACLE_BASE'] = '{{ oracle_base }}'
 os.environ['ORACLE_SID']  = '{{ SID }}'
@@ -52,17 +53,28 @@ status = None
 conn   = None
 cursor = None
 
-try:
-    conn   = cx_Oracle.connect("/", mode=cx_Oracle.SYSDBA)
-    cursor = conn.cursor()
-    cursor.execute("SELECT status FROM v$instance")
-    (status, ) = cursor.fetchone()
-except cx_Oracle.OperationalError as ex:
-    err = str(ex).split('\n')[0]
-    if err != "ORA-01034: ORACLE not available":
-        raise
-    else:
-        status = "NOT STARTED"
+for tries in range(20):
+    try:
+        conn   = cx_Oracle.connect("/", mode=cx_Oracle.SYSDBA)
+        cursor = conn.cursor()
+        cursor.execute("SELECT status FROM v$instance")
+        (status, ) = cursor.fetchone()
+        break
+    except cx_Oracle.OperationalError as ex:
+        err = str(ex).split('\n')[0]
+        if err.startswith("ORA-01034"):
+            status = "NOT STARTED"
+            break
+        elif err.startswith("ORA-01090"):
+            time.sleep(15)
+            status = 'SHUTTING DOWN'
+            continue
+        else:
+            raise
+
+if status == "SHUTTING DOWN":
+    print("Time-out while shutting down. Exiting.")
+    exit(1)
 
 # ------------------------------------------------------------------------------
 # Start up instance, if required

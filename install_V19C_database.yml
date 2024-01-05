@@ -279,81 +279,6 @@
   -                     opatch_version is version(min_opatch_vers, operator='lt', strict=false)
 
 # ------------------------------------------------------------------------------
-# Check fails with rc=1 if patches have not been applied. This is an expected
-# condition, so it is not a playbook failure. 
-# ------------------------------------------------------------------------------
-
-- name:                 "Check if combo patch has been applied"
-  block:
-
-    - name:             "Check if combo patch has been applied"
-      ansible.builtin.command:
-        argv:
-          -             "{{ opatch_bin }}"
-          -             lspatches
-          -             "-verify"
-          -             "-oh"
-          -             "{{ oracle_home }}"
-          -             "{{ combo_patch_directory }}"
-      failed_when:      combo_patch_applied.rc > 1
-      changed_when:     false
-      register:         combo_patch_applied
-      become:           yes
-      become_user:      oracle
-
-    - name:             "Status of combo patch in Oracle Home"
-      ansible.builtin.debug:
-        var:            combo_patch_applied.stdout_lines
-      when:             combo_patch_applied.stdout_lines is defined
-
-  when:                 combo_patch_id is defined
-
-- name:                 "Check if rdbms and ojvm patches have been applied"
-  block:
-
-    - name:               "Check if rdbms patch has been applied"
-      ansible.builtin.command:
-        argv:
-          -             "{{ opatch_bin }}"
-          -             lspatches
-          -             "-verify"
-          -             "-oh"
-          -             "{{ oracle_home }}"
-          -             "{{ rdbms_patch_directory }}"
-      failed_when:      rdbms_patch_applied.rc > 1
-      changed_when:     false
-      register:         rdbms_patch_applied
-      become:           yes
-      become_user:      oracle
-
-    - name:             "Status of rdbms patch in Oracle Home"
-      ansible.builtin.debug:
-        var:            rdbms_patch_applied.stdout_lines
-      when:             rdbms_patch_applied.stdout_lines is defined
-
-    - name:             "Check if ojvm patch has been applied"
-      ansible.builtin.command:
-        argv:
-          -             "{{ opatch_bin }}"
-          -             lspatches
-          -             "-verify"
-          -             "-oh"
-          -             "{{ oracle_home }}"
-          -             "{{ ojvm_patch_directory }}"
-      failed_when:      ojvm_patch_applied.rc > 1
-      changed_when:     false
-      register:         ojvm_patch_applied
-      become:           yes
-      become_user:      oracle
-
-    - name:             "Status of ojvm patch in Oracle Home"
-      ansible.builtin.debug:
-        var:            ojvm_patch_applied.stdout_lines
-      when:             ojvm_patch_applied.stdout_lines is defined
-
-  when:                 combo_patch_id is not defined
-
-# ------------------------------------------------------------------------------
 # Patch Oracle DB Software
 #
 # The following error messages are expected because the DB and listener have not
@@ -376,21 +301,9 @@
     argv:
     -                   "{{ apply_patches }}"
     chdir:              "{{ oracle_home }}"
-  failed_when:          false
   register:             opatch_apply
   changed_when: >
     (opatch_apply.stdout is search('Patch \d+ successfully applied'))
-  when: >
-                        (
-                          combo_patch_applied.stdout is defined and
-                          combo_patch_applied.stdout is search(' NOT registered in Oracle Home')
-                        ) or (
-                          ojvm_patch_applied.stdout is defined and
-                          ojvm_patch_applied.stdout is search(' NOT registered in Oracle Home')
-                        ) or (
-                          rdbms_patch_applied.stdout is defined and 
-                          rdbms_patch_applied.stdout is search(' NOT registered in Oracle Home')
-                        )
   become:               yes
   become_user:          oracle
 
