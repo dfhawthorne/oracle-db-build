@@ -1,9 +1,35 @@
 ---
 # ------------------------------------------------------------------------------
-# Configuration for 19.9 Combo PSU
+# Configuration for 19.21 GI PSU
+#
+# Both RDBMS and OCW RUs are extracted from the GI PSU.
+# OJVM RU is extracted from its own PSU.
 # ------------------------------------------------------------------------------
 
+gi_patch_id:            '35642822'
 ojvm_patch_id:          '35648110'
 rdbms_patch_id:         '35643107'
+ocw_patch_id:           '35655527'
 min_opatch_vers:        '12.2.0.1.40'
+
+ojvm_patch_archive:     "{{ nfs_software_dir }}/Patches/p{{ ojvm_patch_id }}_190000_Linux-x86-64/p{{ ojvm_patch_id }}_190000_Linux-x86-64.zip"
+gi_patch_archive:       "{{ nfs_software_dir }}/Patches/p{{ gi_patch_id }}_190000_Linux-x86-64/p{{ gi_patch_id }}_190000_Linux-x86-64.zip"
+
+gi_patch_directory:     "{{ oracle_home }}/patch/p{{ gi_patch_id }}/{{ gi_patch_id }}"
+ojvm_patch_directory:   "{{ oracle_home }}/patch/p{{ ojvm_patch_id }}/{{ ojvm_patch_id }}"
+rdbms_patch_directory:  "{{ gi_patch_directory }}/{{ rdbms_patch_id }}"
+ocw_patch_directory:    "{{ gi_patch_directory }}/{{ ocw_patch_id }}"
+
+patch_archives:
+- { 
+    src:                "{{ ojvm_patch_archive }}",
+    dest:               "{{ ojvm_patch_directory | dirname }}",
+    creates:            "{{ ojvm_patch_directory }}"
+  }
+- {
+    src:                "{{ gi_patch_archive }}",
+    dest:               "{{ gi_patch_directory | dirname }}",
+    creates:            "{{ gi_patch_directory }}"
+  }
+
 ...

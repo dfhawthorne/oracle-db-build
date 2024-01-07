@@ -2,8 +2,12 @@
 # ------------------------------------------------------------------------------
 # Patches Oracle RDBMS 19.3 Under OL 8
 # Implements recommendation from MOS Doc 2668780.1
+#
 # Ref: Oracle Recommended Patches -- "Oracle JavaVM Component Database PSU and
 #      Update" (OJVM PSU and OJVM Update) Patches (Doc ID 1929745.1)
+#
+# Note: This script assumes that ONLY ONE DB instance is running in the selected
+#       DB home.
 # ------------------------------------------------------------------------------
 
 export ORACLE_SID={{ SID }}
@@ -17,6 +21,9 @@ export PATH={{ oracle_home }}/bin:{{ oracle_home }}/OPatch:${PATH}
 
 rdbms_patch_applied=1
 ojvm_patch_applied=1
+{% if ocw_patch_id is defined -%}
+ocw_patch_applied=1
+{% endif %}
 
 while read keyword patch_id rest_of_line
 do
@@ -29,13 +36,24 @@ do
     case "${patch_id}" in
         {{ rdbms_patch_id }}) rdbms_patch_applied=0;;
         {{ ojvm_patch_id }})  ojvm_patch_applied=0;;
+        {% if ocw_patch_id is defined -%}
+        {{ ocw_patch_id }})   ocw_patch_applied=0;;
+        {% endif %}
         *) ;;
     esac
 done < <(opatch lsinventory)
 
-if [[ "${rdbms_patch_applied}" && "${ojvm_patch_applied}" ]]
+# Stop script if all patches have been applied
+
+if [[ \
+        ( "${rdbms_patch_applied}" -eq 0 ) \
+     && ( "${ojvm_patch_applied}" -eq 0 ) \
+    {% if ocw_patch_id is defined -%}
+     && ( "${ocw_patch_applied}" -eq 0 ) \
+    {% endif %}
+     ]]
 then
-    printf "Both patches have been applied. Exiting.\n"
+    printf "All patches have been applied. Exiting.\n"
     exit 0
 fi
 
@@ -60,12 +78,7 @@ fi
 
 if [[ ! "${rdbms_patch_applied}" ]]
 then
-    {% if combo_patch_id is defined -%}
-    pushd {{ combo_patch_directory }}/{{ rdbms_patch_id }}
-    {% else -%}
     pushd {{ rdbms_patch_directory }}
-    {% endif %}
-    
     
     opatch prereq CheckConflictAgainstOHWithDetail -ph . \
         || exit 1
@@ -76,15 +89,28 @@ then
     popd 
 fi
 
+{% if ocw_patch_id is defined -%}
+# Apply OCW RU
+
+if [[ ! "${ocw_patch_applied}" ]]
+then
+    pushd {{ ocw_patch_directory }}
+    
+    opatch prereq CheckConflictAgainstOHWithDetail -ph . \
+        || exit 1
+    
+    opatch apply -silent \
+        || exit 1
+    
+    popd
+fi
+{% endif %}
+
 # Apply JavaVM RU
 
-if [[ ! "${rdbms_patch_applied}" ]]
+if [[ ! "${ojvm_patch_applied}" ]]
 then
-    {% if combo_patch_id is defined -%}
-    pushd {{ combo_patch_directory }}/{{ ojvm_patch_id }}
-    {% else -%}
     pushd {{ ojvm_patch_directory }}
-    {% endif %}
     
     opatch prereq CheckConflictAgainstOHWithDetail -ph . \
         || exit 1

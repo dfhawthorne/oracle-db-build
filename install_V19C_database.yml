@@ -27,32 +27,12 @@
     response_file:      "{{ oracle_user_home }}/db_install.rsp"
     opatch_source:      "{{ nfs_software_dir }}/OPatch/{{ min_opatch_vers }}/p6880880_190000_Linux-x86-64.zip"
 
-- name:                 "Set Combo Patch Global Variables"
-  ansible.builtin.set_fact:
-    combo_patch_archive:
-                        "{{ nfs_software_dir }}/Patches/p{{ combo_patch_id }}_190000_Linux-x86-64/p{{ combo_patch_id }}_190000_Linux-x86-64.zip"
-    combo_patch_directory:
-                        "{{ oracle_home }}/patch/{{ combo_patch_id }}"
-  when:                 combo_patch_id is defined
-
 - name:                 "Must define RDBMS_PATCH_ID and OJVM_PATCH_ID"
   ansible.builtin.assert:
     msg:                "Must define RDBMS_PATCH_ID and OJVM_PATCH_ID"
     that:  
       -                 rdbms_patch_id is defined
       -                 ojvm_patch_id is defined
-
-- name:                 "Set RDBMS and OJVM Patch Global Variables"
-  ansible.builtin.set_fact:
-    ojvm_patch_archive:
-                        "{{ nfs_software_dir }}/Patches/p{{ ojvm_patch_id }}_190000_Linux-x86-64/p{{ ojvm_patch_id }}_190000_Linux-x86-64.zip"
-    rdbms_patch_archive:
-                        "{{ nfs_software_dir }}/Patches/p{{ rdbms_patch_id }}_190000_Linux-x86-64/p{{ rdbms_patch_id }}_190000_Linux-x86-64.zip"
-    ojvm_patch_directory:
-                        "{{ oracle_home }}/patch/{{ ojvm_patch_id }}"
-    rdbms_patch_directory:
-                        "{{ oracle_home }}/patch/{{ rdbms_patch_id }}"
-  when:                 combo_patch_id is not defined
 
 # ----------------------------------------------------------------------------
 # The Oracle preinstallation RPM should only be installed once, even if
@@ -118,42 +98,28 @@
   become:               yes
   become_user:          oracle
 
-- name:                 "Create directory for Patches"
+- name:                 "Create directories for Patches"
   ansible.builtin.file:
-    name:               "{{ oracle_home }}/patch"
+    name:               "{{ item.dest }}"
     group:              "{{ install_group }}"
     owner:              oracle
     state:              directory
     mode:               0775
   become:               yes
   become_user:          oracle
+  loop:                 "{{ patch_archives }}"
 
-- name:                 "Extract the COMBO patches"
+- name:                 "Extract the patches"
   ansible.builtin.unarchive:
-    creates:            "{{ combo_patch_directory }}"
-    dest:               "{{ oracle_home }}/patch"
-    group:              "{{ install_group }}"
-    owner:              oracle
-    remote_src:         yes
-    src:                "{{ combo_patch_archive }}"
-  when:                 combo_patch_id is defined
-  become:               yes
-  become_user:          oracle
-
-- name:                 "Extract the OJVM and RDBMS patches"
-  ansible.builtin.unarchive:
-    creates:            "{{ item.dir }}"
-    dest:               "{{ oracle_home }}/patch"
+    creates:            "{{ item.creates }}"
+    dest:               "{{ item.dest }}"
     group:              "{{ install_group }}"
     owner:              oracle
     remote_src:         yes
     src:                "{{ item.src }}"
-  when:                 combo_patch_id is not defined
   become:               yes
   become_user:          oracle
-  loop:
-  - {dir: "{{ ojvm_patch_directory }}", src: "{{ ojvm_patch_archive }}"}
-  - {dir: "{{ rdbms_patch_directory }}", src: "{{ rdbms_patch_archive }}"}
+  loop:                 "{{ patch_archives }}"
 
 - name:                 "Check if db s/w has been installed"
   ansible.builtin.command:
@@ -280,20 +246,6 @@
 
 # ------------------------------------------------------------------------------
 # Patch Oracle DB Software
-#
-# The following error messages are expected because the DB and listener have not
-# been created yet:
-#   ERROR:
-#   ORA-01034: ORACLE not available
-#   ORA-27101: shared memory realm does not exist
-#   Linux-x86_64 Error: 2: No such file or directory
-#   TNS-12541: TNS:no listener
-#   TNS-12560: TNS:protocol adapter error
-#   TNS-00511: No listener
-#   Linux Error: 111: Connection refused",
-#   Linux Error: 2: No such file or directory
-#   ORA-01078: failure in processing system parameters
-#   LRM-00109: could not open parameter file 
 # ------------------------------------------------------------------------------
 
 - name:                 "Patch Oracle DB Software"

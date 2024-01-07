@@ -7,4 +7,17 @@ combo_patch_id:         '31720396'
 rdbms_patch_id:         '31771877'
 ojvm_patch_id:          '31668882'
 min_opatch_vers:        '12.2.0.1.19'
+
+combo_patch_archive:     "{{ nfs_software_dir }}/Patches/p{{ combo_patch_id }}_190000_Linux-x86-64/p{{ combo_patch_id }}_190000_Linux-x86-64.zip"
+
+combo_patch_directory:  "{{ oracle_home }}/patch/p{{ combo_patch_id }}/{{ combo_patch_id }}"
+rdbms_patch_directory:  "{{ combo_patch_directory }}/{{ rdbms_patch_id }}"
+ojvm_patch_directory:   "{{ combo_patch_directory }}/{{ ojvm_patch_id }}"
+
+patch_archives:
+- { 
+    src:                "{{ combo_patch_archive }}",
+    dest:               "{{ combo_patch_directory | dirname }}",
+    creates:            "{{ combo_patch_directory }}",
+  }
 ...
