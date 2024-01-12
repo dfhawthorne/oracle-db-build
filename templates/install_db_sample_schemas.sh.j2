@@ -1,0 +1,111 @@
+#!/usr/bin/bash
+# -------------------------------------------------------------------------------
+# Install Oracle DB Sample Schemas
+# Ref:
+# -------------------------------------------------------------------------------
+
+# Setup Oracle RDBMS Environment
+
+export ORACLE_BASE="{{ oracle_base }}"
+export ORACLE_HOME="{{ oracle_db_home }}"
+export ORACLE_SID="{{ SID }}"
+case ":${PATH}:" in
+    *":${ORACLE_HOME}/bin:"*)
+        ;;
+    *)  export PATH="${ORACLE_HOME}/bin:${PATH}"
+        ;;
+esac
+if [[ -n "${LD_LIBRARY_PATH}" ]]
+then
+    case ":${LD_LIBRARY_PATH}:" in
+        *":${ORACLE_HOME}/lib:"*)
+            ;;
+        *)  export LD_LIBRARY_PATH="${ORACLE_HOME}/lib:${LD_LIBRARY_PATH}"
+            ;;
+    esac
+else
+    export LD_LIBRARY_PATH="${ORACLE_HOME}/lib"
+fi
+
+# Validate Environment is Ready
+
+pushd {{ db_sample_dir }} >/dev/null
+
+if [[ ! -r mksample.sql ]]
+then
+    printf "%s: Missing mksample.sql in %s\n" "$0" "{{ db_sample_dir }}" >&2
+    exit 1
+fi
+
+num_pmon="$(ps -ef| grep -cE '[p]mon')"
+num_lsnr="$(ps -ef| grep -cE '[t]ns')"
+
+if [[ "${num_pmon}" -eq 0 ]]
+then
+    printf "%s: No database instances are running.\n" "$0"
+    exit 1
+fi
+
+if [[ "${num_lsnr}" -eq 0 ]]
+then
+    printf "%s: No database listeners are running.\n" "$0"
+    exit 1
+fi
+
+# Check if sample schemas have already been installed.
+
+num_user_schemas=$(sqlplus -S / as sysdba <<SQL_DONE
+SET FEEDBACK OFF
+SET ECHO OFF
+SET HEADING OFF
+
+select count(*) from cdb_users where username in ('BI','HR','IX','OE','PM','SH');
+EXIT
+SQL_DONE
+)
+
+if [[ "$num_user_schemas" -eq 6 ]]
+then
+    printf "All sample schemas have been installed.\n"
+    exit 0
+fi
+
+# Generate passwords
+
+pw_hr="Welcome123456789"
+pw_oe="Welcome123456789"
+pw_pm="Welcome123456789"
+pw_ix="Welcome123456789"
+pw_sh="Welcome123456789"
+pw_bi="Welcome123456789"
+
+# Correct scripts to remove __SUB__CWD__
+
+sed -i -e 's!__SUB__CWD__!{{ db_sample_dir }}!g' $(find . \( -name '*.sql' -o -name '*.dat' \) -type f)
+
+# Run the script
+
+{% if pw_all is defined -%}
+sqlplus -L system/{{ pw_all }}@{{ sample_schema_connect_string }} <<DONE
+@mksample "{{ pw_all }}" "{{ pw_all }}" "${pw_hr}" "${pw_oe}" "${pw_pm}" "${pw_ix}" "${pw_sh}" "${pw_bi}" USERS TEMP   {{ sample_schema_log_dir }} {{ sample_schema_connect_string }}
+{% else -%}
+sqlplus -L system/{{ pw_system }}@{{ sample_schema_connect_string }} <<DONE
+@mksample "{{ pw_system }}" "{{ pw_sys }}" "${pw_hr}" "${pw_oe}" "${pw_pm}" "${pw_ix}" "${pw_sh}" "${pw_bi}" USERS TEMP   {{ sample_schema_log_dir }} {{ sample_schema_connect_string }}
+{% endif %}
+exit
+DONE
+rc=$?
+
+popd >/dev/null
+
+# Evaluate Success of Installation
+
+if [[ "${rc}" -ne 0 ]]
+then
+    printf "%s: mksample.sql failed with RC=%d\n" "$0" "${rc}" >&2
+    exit "${rc}"
+fi
+
+printf "mksample.sql completed successfully\n" "$0"
+
+exit 0

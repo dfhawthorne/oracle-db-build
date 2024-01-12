@@ -25,3 +25,5 @@ Prof. Fred Brooks recommends that one keep a journal of design decisions in orde
 * [2024-01-02](2024_01_02.md) PSU 19.21
 * [2024-01-03](2024_01_03.md) Completed PSU 19.21 Apply
 * [2024-01-05](2024_01_05.md) Improved Patch Detection
+* [2024-01-07](2024_01_07.md) Patch OCW to 19.21
+* [2024-01-12](2024_01_12.md) Install Sample Schemas

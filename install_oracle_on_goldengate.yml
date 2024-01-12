@@ -9,6 +9,10 @@
   - name:               "Main workflow"
     ansible.builtin.include_tasks: install_oracle_rdbms.yml
 
+  - name:               "Install Oracle Sample Schemas"
+    ansible.builtin.include_tasks: install_sample_schemas.yml
+
+
   # ------------------------------------------------------------------------------
   # Handlers
   # ------------------------------------------------------------------------------

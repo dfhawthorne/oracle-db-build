@@ -195,6 +195,34 @@
   when:
     -                   autofs_master.stat is defined
     -                   autofs_master.stat.exists
+# ------------------------------------------------------------------------------
+# Align Oracle Listener End-Point with Configuration
+# ------------------------------------------------------------------------------
+
+- name:                 "Add Oracle Listener End-Point"
+  ansible.builtin.lineinfile:
+    path:               "{{ oracle_home }}/network/admin/listener.ora"
+    line:               "      (ADDRESS = (PROTOCOL = TCP)(HOST = {{ inventory_hostname }})(PORT = {{ oracle_listener_port }}))"
+    regex:              "\\(\\s*PROTOCOL\\s*=\\s*TCP\\s*\\)"
+    state:              present
+  become:               yes
+  become_user:          oracle
+  register:             add_oracle_listener_ep
+
+- name:                 "Restart Oracle Listener"
+  ansible.builtin.command:
+    argv:
+    -                   "{{ restart_listener }}"
+    chdir:              "{{ oracle_user_home }}"
+  register:             restart_oracle_listener
+  become:               yes
+  become_user:          oracle
+  when:                 add_oracle_listener_ep.changed
+
+- name:                 "Output from Restart Oracle Listener"
+  ansible.builtin.debug:
+    var:                restart_oracle_listener.stdout_lines
+  when:                 restart_oracle_listener.stdout_lines is defined
 
 # ------------------------------------------------------------------------------
 # Restart the database instance and open all pluggable databases, then save that
@@ -250,45 +278,11 @@
     (db_repair_result.stdout is search('Number of SQL fixes applied is \d+'))
   become:               yes
   become_user:          oracle
-  when:
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
 
 - name:                 "Output from Repair Oracle DB"
   ansible.builtin.debug:
     var:                db_repair_result.stdout_lines
   when:                 db_repair_result.stdout_lines is defined
-
-- name:                 "Add Oracle Listener end-point"
-  ansible.builtin.lineinfile:
-    path:               "{{ oracle_home }}/network/admin/listener.ora"
-    line:               "      (ADDRESS = (PROTOCOL = TCP)(HOST = {{ inventory_hostname }})(PORT = {{ oracle_listener_port }}))"
-    regex:              "\\(\\s*PROTOCOL\\s*=\\s*TCP\\s*\\)"
-    state:              present
-  become:               yes
-  become_user:          oracle
-  register:             add_oracle_listener_ep
-  when:
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
-
-- name:                 "Restart Oracle Listener"
-  ansible.builtin.command:
-    argv:
-    -                   "{{ restart_listener }}"
-    chdir:              "{{ oracle_user_home }}"
-  register:             restart_oracle_listener
-  become:               yes
-  become_user:          oracle
-  when:
-  -                     oracle_home_path.stat is defined
-  -                     oracle_home_path.stat.exists
-  -                     add_oracle_listener_ep.changed
-
-- name:                 "Output from Restart Oracle Listener"
-  ansible.builtin.debug:
-    var:                restart_oracle_listener.stdout_lines
-  when:                 restart_oracle_listener.stdout_lines is defined
 
 # -----------------------------------------------------------------------------
 # Update .bash_profile for Oracle DB installation

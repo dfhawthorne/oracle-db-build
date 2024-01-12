@@ -124,6 +124,18 @@ if logins == 'RESTRICTED':
 
 cursor.execute("select open_mode from v$pdbs where name='{{ PDBName }}'")
 (pdb_open_mode, ) = cursor.fetchone()
+if pdb_open_mode == "MIGRATE":
+    try:
+        cursor.execute("ALTER PLUGGABLE DATABASE {{ PDBName }} CLOSE")
+        print("PDB ({{ PDBName }}) closed")
+        cursor.execute("ALTER PLUGGABLE DATABASE {{ PDBName }} OPEN")
+        print("PDB ({{ PDBName }}) opened")
+    except cx_Oracle.DatabaseError as exc:
+        print(f"Restart of PDB ({{ PDBName }}) failed:");
+        error, = exc.args
+        print("Oracle-Error-Code:", error.code)
+        print("Oracle-Error-Message:", error.message)
+        exit(1)
 if pdb_open_mode == "MOUNTED":
     try:
         cursor.execute("ALTER PLUGGABLE DATABASE {{ PDBName }} OPEN")

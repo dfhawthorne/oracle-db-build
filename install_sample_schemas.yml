@@ -1,0 +1,81 @@
+---
+# ------------------------------------------------------------------------------
+# Install Oracle Schemas as downloaded from
+# https://github.com/oracle-samples/db-sample-schemas/releases
+# ------------------------------------------------------------------------------
+
+- name:                 "Set variables for 19C Sample Schemas Installation"
+  ansible.builtin.set_fact:
+    db_sample_source:   "{{ nfs_software_dir }}/oracle_sample_schemas/db-sample-schemas-19.2.tar.gz"
+    db_sample_dir:      "{{ oracle_user_home }}/db-sample-schemas-19.2"
+  when:                 oracle_rdbms_version == "V19C"
+
+- name:                 "Set variables for 21C Sample Schemas Installation"
+  ansible.builtin.set_fact:
+    db_sample_source:   "{{ nfs_software_dir }}/oracle_sample_schemas/db-sample-schemas-21.1.tar.gz"
+    db_sample_dir:      "{{ oracle_user_home }}/db-sample-schemas-21.1"
+  when:                 oracle_rdbms_version == "V21C"
+
+- name:                 "Set variables for 23C Sample Schemas Installation"
+  ansible.builtin.set_fact:
+    db_sample_source:   "{{ nfs_software_dir }}/oracle_sample_schemas/db-sample-schemas-23.2.tar.gz"
+    db_sample_dir:      "{{ oracle_user_home }}/db-sample-schemas-23.2"
+  when:                 oracle_rdbms_version == "V23C"
+
+- name:                 "Other Variables for Installation of Sample Schemas"
+  ansible.builtin.set_fact:
+    sample_schema_connect_string:
+                        "{{ ansible_hostname }}:{{ oracle_listener_port }}/{{ PDBName }}.yaocm.id.au"
+    sample_schema_driver_script:
+                        "{{ oracle_user_home }}/install_db_sample_schemas.sh"
+    sample_schema_log_dir:
+                        "{{ oracle_user_home }}/sample_log"
+
+- name:                 "Create Sample Schemas Installation Directories"
+  ansible.builtin.file:
+    path:               "{{ item }}"
+    group:              "{{ install_group }}"
+    owner:              oracle
+    state:              directory
+    mode:               0775
+  become:               yes
+  become_user:          oracle
+  loop:
+    -                   "{{ db_sample_dir }}"
+
+- name:                 "Extract Sample Schemas Installation Scripts"
+  ansible.builtin.unarchive:
+    creates:            "{{ db_sample_dir }}"
+    dest:               "{{ db_sample_dir | dirname }}"
+    src:                "{{ db_sample_source }}"
+    remote_src:         yes
+  become:               yes
+  become_user:          oracle
+
+- name:                 "Create Sample Schemas Installation Driver Script"
+  ansible.builtin.template:
+    src:                "{{ item.dest | basename }}.j2"
+    dest:               "{{ item.dest }}"
+    mode:               "{{ item.mode }}"
+  become:               yes
+  become_user:          oracle
+  with_items:
+  - { dest: "{{ sample_schema_driver_script }}", mode: "0700" }
+
+- name:                 "Install Sample Schemas Using Installation Driver Script"
+  ansible.builtin.command:
+    argv:
+      -                 "{{ sample_schema_driver_script }}"
+  become:               yes
+  become_user:          oracle
+  register:             install_db_schemas
+  changed_when:         install_db_schemas.stdout is search('mksample\.sql completed successfully')
+  failed_when: >
+                        (install_db_schemas.rc != 0) or
+                        (install_db_schemas.stdout is search('SP2-\d+:'))
+
+- name:                 "Display Output from Installation of Sample Schemas"
+  ansible.builtin.debug:
+    var:                install_db_schemas.stdout_lines
+  when:                 install_db_schemas.stdout_lines is defined
+...
